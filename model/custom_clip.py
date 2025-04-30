@@ -48,25 +48,51 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
+        # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
+
+        # logit_scale: scalar (e.g., initialized as a learnable parameter like torch.tensor(1/0.07).log())
         logit_scale = self.logit_scale.exp()
 
+        # image: [B, 3, H, W]
+        # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
         image_features = self.image_encoder(image.type(self.dtype))
+
+        # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
-        prompts = self.prompt_learner(image_features)
-        
+        # prompts: List of [num_classes, context_length, D] (one per image feature)
+        # Each element is generated conditioned on an image feature
+        prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
+
         logits = []
+        # Iterate over batch
         for pts_i, imf_i in zip(prompts, image_features):
+            # pts_i: [num_classes, context_length, D]
+            # tokenized_prompts: [num_classes, context_length]
+            # text_features: [num_classes, D]
             text_features = self.text_encoder(pts_i, tokenized_prompts)
+
+            # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+            # imf_i: [D], text_features.T: [D, num_classes]
+            # l_i: [num_classes], similarity scores between image and all class prompts
             l_i = logit_scale * imf_i @ text_features.t()
+
+            # Append l_i (1D tensor) to logits list
             logits.append(l_i)
+
+        # logits: list of B tensors each of shape [num_classes]
+        # stacked into a tensor of shape [B, num_classes]
         logits = torch.stack(logits)
-        
+
+        # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
+            # logits: [B, num_classes], label: [B]
             return F.cross_entropy(logits, label)
-        
+
+        # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
 
 
