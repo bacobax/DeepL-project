@@ -1,7 +1,10 @@
+from clip.model import CLIP
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
+
+from model.custom_clip import CustomCLIP
 from model.prompt_learner import PromptLearner
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
@@ -86,59 +89,32 @@ def test_step(model, dataset, new_classnames, batch_size, device, label="test", 
 
 
 @torch.no_grad()
-def finetuned_test_step(model, dataset, new_classnames, batch_size, device, label="test"):
+def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, device, label="test"):
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    new_classnames = [CLASS_NAMES[c] for c in new_classnames]
+    with model.change_classnames(new_classnames):
+        correct = 0
+        total = 0
 
-    # --- Temporarily update class-specific buffers while preserving learned ctx/meta_net ---
-    original_classnames = model.prompt_learner.n_cls
-    original_tokenized_prompts = model.tokenized_prompts
-    original_token_prefix = model.prompt_learner.token_prefix
-    original_token_suffix = model.prompt_learner.token_suffix
+        for images, targets in tqdm(dataloader, desc=label):
+            images = images.to(device)
+            targets = targets.to(device)
 
-    # Create a dummy prompt learner with new classnames (reuse trained ctx/meta_net)
-    temp_prompt_learner = PromptLearner(
-        cfg=model.cfg,
-        classnames=[CLASS_NAMES[idx] for idx in new_classnames],
-        clip_model=model.clip_model
-    ).to(device)
+            logits = model(images)
+            predictions = logits.argmax(dim=-1)
 
-    model.tokenized_prompts = temp_prompt_learner.tokenized_prompts
-    model.prompt_learner.tokenized_prompts = temp_prompt_learner.tokenized_prompts
-
-    model.prompt_learner.n_cls = len(new_classnames)
-    model.prompt_learner.token_prefix = temp_prompt_learner.token_prefix
-    model.prompt_learner.token_suffix = temp_prompt_learner.token_suffix
-
-    correct = 0
-    total = 0
-
-    for images, targets in tqdm(dataloader, desc=label):
-        images = images.to(device)
-        targets = targets.to(device)
-
-        logits = model(images)
-        predictions = logits.argmax(dim=-1)
-
-        correct += (predictions == targets).sum().item()
-        total += targets.size(0)
+            correct += (predictions == targets).sum().item()
+            total += targets.size(0)
 
     accuracy = correct / total
-
-    # --- Restore original class settings ---
-    model.tokenized_prompts = original_tokenized_prompts
-    model.prompt_learner.tokenized_prompts = original_tokenized_prompts
-    model.prompt_learner.n_cls = original_classnames
-    model.prompt_learner.token_prefix = original_token_prefix
-    model.prompt_learner.token_suffix = original_token_suffix
-
     return accuracy
 
 
 @torch.no_grad()  # we don't want gradients
-def base_test_step(model, dataset, categories, batch_size, device, label=""):
+def base_test_step(model: CLIP, dataset, categories, batch_size, device, label=""):
     # let's set the model in evaluation mode
     model.eval()
 

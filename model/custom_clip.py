@@ -1,6 +1,7 @@
 import os.path as osp
 from collections import OrderedDict
 import math
+from contextlib import contextmanager
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,39 @@ class CustomCLIP(nn.Module):
         self.clip_model = clip_model
         self.cfg = cfg
 
-    def forward(self, image, label=None):
+    @contextmanager
+    def temporary_classnames(self, new_classnames):
+        # --- Save original state ---
+        original_classnames = self.prompt_learner.n_cls
+        original_tokenized_prompts = self.tokenized_prompts
+        original_token_prefix = self.prompt_learner.token_prefix
+        original_token_suffix = self.prompt_learner.token_suffix
+
+        # --- Apply temporary state ---
+        temp_prompt_learner = PromptLearner(
+            cfg=self.cfg,
+            classnames=new_classnames,
+            clip_model=self.clip_model
+        )
+
+        self.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.token_prefix = temp_prompt_learner.token_prefix
+        self.prompt_learner.token_suffix = temp_prompt_learner.token_suffix
+        self.prompt_learner.n_cls = len(new_classnames)
+
+        try:
+            yield
+        finally:
+            # --- Restore original state ---
+            self.tokenized_prompts = original_tokenized_prompts
+            self.prompt_learner.tokenized_prompts = original_tokenized_prompts
+            self.prompt_learner.token_prefix = original_token_prefix
+            self.prompt_learner.token_suffix = original_token_suffix
+            self.prompt_learner.n_cls = original_classnames
+
+
+def forward(self, image, label=None):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 
