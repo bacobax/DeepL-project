@@ -1,1 +1,6 @@
 data
+logs
+runs
+cifar10
+.idea
+.qodo

@@ -1,31 +1,58 @@
-import clip
+from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
+import clip
+from model.prompt_learner import PromptLearner
+from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
-from utils.datasets import CLASS_NAMES
+
+@torch.no_grad()
+def eval_step(model, dataset, cost_function, batch_size=32, device="cuda"):
+    model.eval()
+
+    tmp_dataset = ContiguousLabelDataset(dataset)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+
+    total_loss = 0.0
+    correct = 0
+    total = 0
+
+    for images, targets in tqdm(dataloader, desc="Validation"):
+        images = images.to(device)
+        targets = targets.to(device)
+
+        logits = model(images)
+        loss = cost_function(logits, targets)
+
+        total_loss += loss.item() * targets.size(0)
+        predictions = logits.argmax(dim=-1)
+        correct += (predictions == targets).sum().item()
+        total += targets.size(0)
+
+    avg_loss = total_loss / total
+    accuracy = correct / total
+    return avg_loss, accuracy
 
 
-
-def training_step(net, data_loader, optimizer, cost_function, device="cuda"):
+def training_step(model, dataset, optimizer, batch_size, device="cuda"):
     samples = 0.0
     cumulative_loss = 0.0
     cumulative_accuracy = 0.0
 
     # Set the network to training mode
-    net.train()
 
-    # Iterate over the training set
-    pbar = tqdm(data_loader, desc="Training", position=0, leave=True, total=len(data_loader))
-    for batch_idx, (inputs, targets) in enumerate(data_loader):
+    model.train()
+
+    tmp_dataset = ContiguousLabelDataset(dataset)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    pbar = tqdm(dataloader, desc="Training", position=0, leave=True)
+    for batch_idx, (inputs, targets) in enumerate(dataloader):
         # Load data into GPU
         inputs = inputs.to(device)
         targets = targets.to(device)
 
-        # Forward pass
-        outputs = net(inputs)
-
-        # Loss computation
-        loss = cost_function(outputs, targets)
+        # Forward pass + loss computation
+        logits, loss = model(inputs, targets)
 
         # Backward pass
         loss.backward()
@@ -38,8 +65,8 @@ def training_step(net, data_loader, optimizer, cost_function, device="cuda"):
 
         # Fetch prediction and loss value
         samples += inputs.shape[0]
-        cumulative_loss += loss.item()
-        _, predicted = outputs.max(dim=1) # max() returns (maximum_value, index_of_maximum_value)
+        cumulative_loss += loss.item() * inputs.shape[0]
+        _, predicted = logits.max(dim=1)  # max() returns (maximum_value, index_of_maximum_value)
 
         # Compute training accuracy
         cumulative_accuracy += predicted.eq(targets).sum().item()
@@ -51,27 +78,110 @@ def training_step(net, data_loader, optimizer, cost_function, device="cuda"):
 
 
 @torch.no_grad()
-def test_step(model, dataset, categories, batch_size, device, label=""):
+def test_step(model, dataset, new_classnames, batch_size, device, label="test", base=False):
+    if not base:
+        return finetuned_test_step(model, dataset, new_classnames, batch_size, device, label)
+    else:
+        return base_test_step(model, dataset, new_classnames, batch_size, device, label)
+
+
+@torch.no_grad()
+def finetuned_test_step(model, dataset, new_classnames, batch_size, device, label="test"):
     model.eval()
 
-    # Map categories to contiguous indices
-    contig_cat2idx = {cat: idx for idx, cat in enumerate(categories)}
+    tmp_dataset = ContiguousLabelDataset(dataset)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    # --- Temporarily update class-specific buffers while preserving learned ctx/meta_net ---
+    original_classnames = model.prompt_learner.n_cls
+    original_tokenized_prompts = model.tokenized_prompts
+    original_token_prefix = model.prompt_learner.token_prefix
+    original_token_suffix = model.prompt_learner.token_suffix
 
-    correct_predictions = 0
+    # Create a dummy prompt learner with new classnames (reuse trained ctx/meta_net)
+    temp_prompt_learner = PromptLearner(
+        cfg=model.cfg,
+        classnames=[CLASS_NAMES[idx] for idx in new_classnames],
+        clip_model=model.clip_model
+    ).to(device)
+
+    model.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+    model.prompt_learner.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+
+    model.prompt_learner.n_cls = len(new_classnames)
+    model.prompt_learner.token_prefix = temp_prompt_learner.token_prefix
+    model.prompt_learner.token_suffix = temp_prompt_learner.token_suffix
+
+    correct = 0
     total = 0
 
     for images, targets in tqdm(dataloader, desc=label):
         images = images.to(device)
-        targets = torch.tensor([contig_cat2idx[t.item()] for t in targets]).long().to(device)
+        targets = targets.to(device)
 
-        # Directly call model.forward()
-        logits = model(images)  # this returns the cosine similarity scores
-
+        logits = model(images)
         predictions = logits.argmax(dim=-1)
-        correct_predictions += (predictions == targets).sum().item()
+
+        correct += (predictions == targets).sum().item()
         total += targets.size(0)
 
-    accuracy = correct_predictions / total
+    accuracy = correct / total
+
+    # --- Restore original class settings ---
+    model.tokenized_prompts = original_tokenized_prompts
+    model.prompt_learner.tokenized_prompts = original_tokenized_prompts
+    model.prompt_learner.n_cls = original_classnames
+    model.prompt_learner.token_prefix = original_token_prefix
+    model.prompt_learner.token_suffix = original_token_suffix
+
+    return accuracy
+
+
+@torch.no_grad()  # we don't want gradients
+def base_test_step(model, dataset, categories, batch_size, device, label=""):
+    # let's set the model in evaluation mode
+    model.eval()
+
+    # Remap labels into a contiguous set starting from zero
+    contig_cat2idx = {cat: idx for idx, cat in enumerate(categories)}
+
+    # here we apply the standard CLIP template used for oxford flowers to all categories
+    # and immediately tokenize each sentence (convert natural language into numbers - feel free to print the text input to inspect them)
+    text_inputs = clip.tokenize(
+        [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in categories]
+    ).to(device)
+
+    # we can encode the text features once as they are shared for all images
+    # therefore we do it outside the evaluation loop
+    text_features = model.encode_text(text_inputs)
+    # and here we normalize them (standard pratice with CLIP)
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+
+    # simple dataloader creation
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+
+    # here we store the number of correct predictions we will make
+    correct_predictions = 0
+    for image, target in tqdm(dataloader, desc=label):
+        # base categories range from 0 to 50, while novel ones from 51 to 101
+        # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
+        # Map targets in contiguous set starting from zero
+        # Labels needs to be .long() in pytorch
+        target = torch.Tensor([contig_cat2idx[t.item()] for t in target]).long()
+
+        image = image.to(device)
+        target = target.to(device)
+
+        # forward image through CLIP image encoder
+        image_features = model.encode_image(image)
+        # and normalize
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+
+        # here cosine similarity between image and text features and keep the argmax for every row (every image)
+        predicted_class = (image_features @ text_features.T).argmax(dim=-1)
+        # now we check which are correct, and sum them (False == 0, True == 1)
+        correct_predictions += (predicted_class == target).sum().item()
+
+    # and now we compute the accuracy
+    accuracy = correct_predictions / len(dataset)
     return accuracy

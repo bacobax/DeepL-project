@@ -1,6 +1,14 @@
 from training_system import CoCoOpSystem
-
+import torch
+import os
 if __name__ == "__main__":
+    #take the device name from DEVICE env variable
+    device = os.getenv("DEVICE", "cuda:0")
+    print(f"Using device: {device}")
+
+    if torch.backends.mps.is_available():
+        print("⚠️ Forcing float32 due to MPS limitations")
+        torch.set_default_dtype(torch.float32)
     train_sys = CoCoOpSystem(
         dataset_name="cifar10",
         batch_size=16,
