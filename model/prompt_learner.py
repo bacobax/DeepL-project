@@ -46,9 +46,11 @@ class PromptLearner(nn.Module):
             ("relu", nn.ReLU(inplace=True)),
             ("linear2", nn.Linear(vis_dim // 16, ctx_dim))
         ]))
-        
-        if cfg.TRAINER.COCOOP.PREC == "fp16":
+
+        if cfg.TRAINER.COCOOP.PREC == "fp16" and not torch.backends.mps.is_available():
             self.meta_net.half()
+        else:
+            print("⚠️ Using float32 for meta_net due to MPS")
 
         classnames = [name.replace("_", " ") for name in classnames]
         name_lens = [len(_tokenizer.encode(name)) for name in classnames]
@@ -56,8 +58,19 @@ class PromptLearner(nn.Module):
 
         tokenized_prompts = torch.cat([clip.tokenize(p) for p in prompts])  # (n_cls, n_tkn)
         with torch.no_grad():
-            embedding = clip_model.token_embedding(tokenized_prompts).type(dtype)
+            device = clip_model.token_embedding.weight.device
 
+            # Ensure tokenized_prompts is on the right device BEFORE embedding
+            tokenized_prompts = tokenized_prompts.to(device)
+
+            embedding = clip_model.token_embedding(tokenized_prompts)
+
+            # Do not convert to fp16 on MPS (Apple doesn't support it fully)
+            if device.type == "mps" and dtype == torch.float16:
+                print("⚠️ fp16 not fully supported on MPS; using float32 instead")
+                dtype = torch.float32
+
+            embedding = embedding.to(dtype)
         # These token vectors will be saved when in save_model(),
         # but they should be ignored in load_model() as we want to use
         # those computed using the current class names
@@ -95,6 +108,7 @@ class PromptLearner(nn.Module):
         suffix = self.token_suffix
         ctx = self.ctx                     # (n_ctx, ctx_dim)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
+
         bias = bias.unsqueeze(1)           # (batch, 1, ctx_dim)
         ctx = ctx.unsqueeze(0)             # (1, n_ctx, ctx_dim)
         ctx_shifted = ctx + bias           # (batch, n_ctx, ctx_dim)

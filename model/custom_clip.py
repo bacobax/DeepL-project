@@ -46,6 +46,8 @@ class CustomCLIP(nn.Module):
         self.text_encoder = TextEncoder(clip_model)
         self.logit_scale = clip_model.logit_scale
         self.dtype = clip_model.dtype
+        self.clip_model = clip_model
+        self.cfg = cfg
 
     def forward(self, image, label=None):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
@@ -64,7 +66,7 @@ class CustomCLIP(nn.Module):
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
         prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
-
+        # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
         # Iterate over batch
         for pts_i, imf_i in zip(prompts, image_features):
@@ -90,7 +92,7 @@ class CustomCLIP(nn.Module):
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
-            return F.cross_entropy(logits, label)
+            return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
