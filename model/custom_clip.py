@@ -82,7 +82,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.n_cls = original_classnames
 
 
-def forward(self, image, label=None):
+    def forward(self, image, label=None):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 

@@ -13,7 +13,7 @@ if __name__ == "__main__":
         dataset_name="cifar10",
         batch_size=16,
         num_classes=10,
-        device="mps",
+        device=device,
         learning_rate=0.002,
         weight_decay=0.0005,
         momentum=0.9,

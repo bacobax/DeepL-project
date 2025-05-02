@@ -4,3 +4,4 @@ runs
 cifar10
 .idea
 .qodo
+__pycache__
