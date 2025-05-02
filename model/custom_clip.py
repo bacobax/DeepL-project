@@ -129,31 +129,3 @@ class CustomCLIP(nn.Module):
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
-
-
-if __name__ == '__main__':
-    clip_model = clip.load("ViT-B/32", jit=False)[0]
-
-    # Define sample classnames for testing
-    classnames = [
-        "dog", "cat", "bird", "fish", "horse",
-        "elephant", "bear", "zebra", "giraffe", "lion"
-    ]
-
-    cfg = EasyDict()
-
-    # Training configuration
-    cfg.TRAINER = EasyDict()
-    cfg.TRAINER.COCOOP = EasyDict()
-    cfg.TRAINER.COCOOP.N_CTX = 16  # Number of context tokens
-    cfg.TRAINER.COCOOP.CTX_INIT = ""  # Leave empty for random initialization
-    cfg.TRAINER.COCOOP.PREC = "fp16"  # Precision for meta network
-
-    # Input configuration
-    cfg.INPUT = EasyDict()
-
-    resolution = clip_model.visual.input_resolution
-
-    cfg.INPUT.SIZE = [resolution, resolution]  # Must match CLIP model's input resolution
-    # Initialize CustomCLIP with all required parameters
-    custom_clip = CustomCLIP(cfg, classnames, clip_model)
