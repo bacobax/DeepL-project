@@ -1,6 +1,7 @@
 from training_system import CoCoOpSystem
 import torch
 import os
+from datetime import datetime
 if __name__ == "__main__":
     #take the device name from DEVICE env variable
     device = os.getenv("DEVICE", "cuda:0")
@@ -17,7 +18,7 @@ if __name__ == "__main__":
         weight_decay=0.0005,
         momentum=0.9,
         epochs=30,
-        run_name="exp2",
+        run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         n_ctx=4,
         ctx_init="",
         class_token_position="end",
