@@ -94,9 +94,11 @@ class CoCoOpSystem:
     def train(self):
         print("Before training:")
         self.compute_evaluation(-1, base=True)
+        print("Training the model...")
         print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results
-        for e in tqdm(range(self.epochs), desc="OVERALL TRAINING", position=0, leave=True):
+        pbar = tqdm(total=self.epochs, desc="OVERALL TRAINING", position=0, leave=True)
+        for e in range(self.epochs):
             base_train_loss, base_train_accuracy = training_step(
                 model=self.model,
                 dataset=self.train_base,
@@ -124,7 +126,9 @@ class CoCoOpSystem:
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 
-                tqdm.write(f"Train Acc: {base_train_accuracy} Val Acc: {base_val_accuracy}")
+                pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+            pbar.update(1)
+
         print("After training:")
         self.compute_evaluation(self.epochs)
         self.writer.close()

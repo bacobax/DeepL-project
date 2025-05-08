@@ -74,10 +74,10 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         # Compute training accuracy
         cumulative_accuracy += predicted.eq(targets).sum().item()
 
-        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy / samples * 100)
+        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy / samples )
         pbar.update(1)
 
-    return cumulative_loss / samples, cumulative_accuracy / samples * 100
+    return cumulative_loss / samples, cumulative_accuracy / samples
 
 
 @torch.no_grad()
