@@ -1,9 +1,12 @@
-
+import os.path as osp
+from collections import OrderedDict
+import math
 from contextlib import contextmanager
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch.cuda.amp import GradScaler, autocast
 from model.prompt_learner import PromptLearner
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
@@ -78,6 +81,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.token_suffix = original_token_suffix
             self.prompt_learner.n_cls = original_classnames
 
+
     def forward(self, image, label=None):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
@@ -94,8 +98,7 @@ class CustomCLIP(nn.Module):
 
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
-        prompts = self.prompt_learner(image_features)  # [B , n_cls, n_ctx, D]
-        # [P1+bias1, P2+bias2, CLS_0] [P1+bias1, P2+bias2, CLS_1]
+        prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
         # Iterate over batch
@@ -126,31 +129,3 @@ class CustomCLIP(nn.Module):
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
-
-
-if __name__ == '__main__':
-    clip_model = clip.load("ViT-B/32", jit=False)[0]
-
-    # Define sample classnames for testing
-    classnames = [
-        "dog", "cat", "bird", "fish", "horse",
-        "elephant", "bear", "zebra", "giraffe", "lion"
-    ]
-
-    cfg = EasyDict()
-
-    # Training configuration
-    cfg.TRAINER = EasyDict()
-    cfg.TRAINER.COCOOP = EasyDict()
-    cfg.TRAINER.COCOOP.N_CTX = 16  # Number of context tokens
-    cfg.TRAINER.COCOOP.CTX_INIT = ""  # Leave empty for random initialization
-    cfg.TRAINER.COCOOP.PREC = "fp16"  # Precision for meta network
-
-    # Input configuration
-    cfg.INPUT = EasyDict()
-
-    resolution = clip_model.visual.input_resolution
-
-    cfg.INPUT.SIZE = [resolution, resolution]  # Must match CLIP model's input resolution
-    # Initialize CustomCLIP with all required parameters
-    custom_clip = CustomCLIP(cfg, classnames, clip_model)
