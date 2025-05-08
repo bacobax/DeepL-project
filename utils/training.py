@@ -20,7 +20,7 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda"):
     correct = 0
     total = 0
 
-    for images, targets in tqdm(dataloader, desc="Validation"):
+    for images, targets in tqdm(dataloader, desc="Validation", position=1, leave=False):
         images = images.to(device)
         targets = targets.to(device)
 
@@ -48,7 +48,7 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-    pbar = tqdm(dataloader, desc="Training", position=0, leave=True)
+    pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
     for batch_idx, (inputs, targets) in enumerate(dataloader):
         # Load data into GPU
         inputs = inputs.to(device)

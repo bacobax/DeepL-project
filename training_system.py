@@ -1,4 +1,5 @@
 from easydict import EasyDict
+from tqdm import tqdm
 
 from model.custom_clip import CustomCLIP
 from utils.datasets import  get_data, base_novel_categories, split_data, CLASS_NAMES
@@ -89,7 +90,7 @@ class CoCoOpSystem:
         print("Before training:")
         self.compute_evaluation(-1, base=True)
         # For each epoch, train the network and then compute evaluation results
-        for e in range(self.epochs):
+        for e in tqdm(range(self.epochs), desc="OVERALL TRAINING", position=0, leave=True):
             train_loss, train_accuracy = training_step(
                 model=self.model,
                 dataset=self.train_base,
@@ -107,7 +108,7 @@ class CoCoOpSystem:
 
             self.log_values(e, train_loss, train_accuracy, "train")
             self.log_values(e, val_loss, val_accuracy, "validation")
-
+            tqdm.write(f"Train Acc: {train_accuracy} Val Acc: {val_accuracy}")
         print("After training:")
         self.compute_evaluation(self.epochs)
         self.writer.close()
