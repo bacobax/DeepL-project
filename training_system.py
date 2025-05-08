@@ -1,3 +1,6 @@
+import os
+
+import torch
 from easydict import EasyDict
 from tqdm import tqdm
 
@@ -40,6 +43,8 @@ class CoCoOpSystem:
 
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/{run_name}")
+        self.writer.add_scalar(f"lr", self.learning_rate, 0)
+        self.writer.add_scalar(f"momentum", self.momentum, 0)
 
         # Get dataloaders
 
@@ -51,7 +56,7 @@ class CoCoOpSystem:
 
         # split the three datasets
         self.train_base, _ = split_data(self.train_set, self.base_classes)
-        self.val_base, _ = split_data(self.val_set, self.base_classes)
+        self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
         #self.classnames, _ = embed_dataset_classnames(dataset_name, preprocess=preprocess, model=clip_model)
@@ -89,29 +94,55 @@ class CoCoOpSystem:
     def train(self):
         print("Before training:")
         self.compute_evaluation(-1, base=True)
+        print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results
         for e in tqdm(range(self.epochs), desc="OVERALL TRAINING", position=0, leave=True):
-            train_loss, train_accuracy = training_step(
+            base_train_loss, base_train_accuracy = training_step(
                 model=self.model,
                 dataset=self.train_base,
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
                 device=self.device,
             )
-            val_loss, val_accuracy = eval_step(
-                model=self.model,
-                dataset=self.val_base,
-                cost_function=self.cost_function,
-                device=self.device,
-                batch_size=self.batch_size,
-            )
+            if e % print_epoch_interval == 0:
+                base_val_loss, base_val_accuracy = eval_step(
+                    model=self.model,
+                    dataset=self.val_base,
+                    cost_function=self.cost_function,
+                    device=self.device,
+                    batch_size=self.batch_size,
+                )
+                novel_val_loss, novel_val_accuracy = eval_step(
+                    model=self.model,
+                    dataset=self.val_novel,
+                    cost_function=self.cost_function,
+                    device=self.device,
+                    batch_size=self.batch_size,
+                )
 
-            self.log_values(e, train_loss, train_accuracy, "train")
-            self.log_values(e, val_loss, val_accuracy, "validation")
-            tqdm.write(f"Train Acc: {train_accuracy} Val Acc: {val_accuracy}")
+                self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
+                self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
+                self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
+
+                tqdm.write(f"Train Acc: {base_train_accuracy} Val Acc: {base_val_accuracy}")
         print("After training:")
         self.compute_evaluation(self.epochs)
         self.writer.close()
+
+        self.save_model()
+
+    def save_model(self, path="./bin"):
+        #create folder if not exist
+        if not os.path.exists(path):
+            os.makedirs(path)
+        # Save the model
+        torch.save(self.model.state_dict(), os.path.join(path, f"{self.run_name}.pth"))
+
+    def load_model(self, path="./bin"):
+        # Load the model
+        self.model.load_state_dict(torch.load(os.path.join(path, f"{self.run_name}.pth")))
+        self.model.eval()
+        print(f"Model loaded from {path}")
 
     def compute_evaluation(self, epoch_idx, base=False):
         base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
