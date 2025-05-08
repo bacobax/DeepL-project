@@ -120,6 +120,7 @@ class CoCoOpSystem:
                     cost_function=self.cost_function,
                     device=self.device,
                     batch_size=self.batch_size,
+                    new_classnames=self.novel_classes,
                 )
 
                 self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
