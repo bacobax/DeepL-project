@@ -17,6 +17,7 @@ class PromptLearner(nn.Module):
         dtype = clip_model.dtype
         ctx_dim = clip_model.ln_final.weight.shape[0]
         vis_dim = clip_model.visual.output_dim
+
         clip_imsize = clip_model.visual.input_resolution
         cfg_imsize = cfg.INPUT.SIZE[0]
         assert cfg_imsize == clip_imsize, f"cfg_imsize ({cfg_imsize}) must equal to clip_imsize ({clip_imsize})"
@@ -103,7 +104,6 @@ class PromptLearner(nn.Module):
 
         return prompts
 
-
     def forward(self, im_features):
         prefix = self.token_prefix
         suffix = self.token_suffix
@@ -117,7 +117,7 @@ class PromptLearner(nn.Module):
         # Use instance-conditioned context tokens for all classes
         prompts = []
         for ctx_shifted_i in ctx_shifted:
-            ctx_i = ctx_shifted_i.unsqueeze(0).expand(self.n_cls, -1, -1)
+            ctx_i = ctx_shifted_i.unsqueeze(0).expand(self.n_cls, -1, -1) # (n_cls, n_ctx, ctx_dim)
             pts_i = self.construct_prompts(ctx_i, prefix, suffix)  # (n_cls, n_tkn, ctx_dim)
             prompts.append(pts_i)
         prompts = torch.stack(prompts)

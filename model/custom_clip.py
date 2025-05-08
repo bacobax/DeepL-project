@@ -1,12 +1,9 @@
-import os.path as osp
-from collections import OrderedDict
-import math
+
 from contextlib import contextmanager
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.cuda.amp import GradScaler, autocast
 from model.prompt_learner import PromptLearner
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
@@ -81,8 +78,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.token_suffix = original_token_suffix
             self.prompt_learner.n_cls = original_classnames
 
-
-def forward(self, image, label=None):
+    def forward(self, image, label=None):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 
@@ -98,7 +94,8 @@ def forward(self, image, label=None):
 
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
-        prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
+        prompts = self.prompt_learner(image_features)  # [B , n_cls, n_ctx, D]
+        # [P1+bias1, P2+bias2, CLS_0] [P1+bias1, P2+bias2, CLS_1]
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
         # Iterate over batch

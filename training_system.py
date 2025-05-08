@@ -11,7 +11,6 @@ from torch import nn
 
 class CoCoOpSystem:
     def __init__(self,
-                 dataset_name="cifar10",
                  batch_size=16,
                  num_classes=10,
                  device="cuda:0",
@@ -25,7 +24,6 @@ class CoCoOpSystem:
                  class_token_position="end",
                  csc=False,
                  ):
-        self.dataset_name = dataset_name
         self.batch_size = batch_size
         self.num_classes = num_classes
         self.device = device
@@ -45,7 +43,7 @@ class CoCoOpSystem:
         # Get dataloaders
 
         self.clip_model, preprocess = clip.load("RN50")
-        self.train_set, self.val_set, self.test_set = get_data(dataset_name, transform=preprocess)
+        self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
 
         # split classes into base and novel
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)

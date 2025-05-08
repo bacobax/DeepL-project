@@ -95,7 +95,7 @@ def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
     new_classnames = [CLASS_NAMES[c] for c in new_classnames]
-    with model.change_classnames(new_classnames):
+    with model.temporary_classnames(new_classnames):
         correct = 0
         total = 0
 
