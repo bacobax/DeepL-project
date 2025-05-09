@@ -22,6 +22,7 @@ class TextEncoder(nn.Module):
         # Take features from the eot embedding (eot_token is the highest number in each sequence)
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
 
+
         return x
 
 class PromptLearnerCoOp(nn.Module):
