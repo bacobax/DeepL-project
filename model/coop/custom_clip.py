@@ -69,10 +69,10 @@ class CustomCLIPCoOp(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
-        logit_scale = torch.clamp(self.logit_scale, max=4.5).exp()
+        logit_scale = self.logit_scale.exp().item()  # exp(2.5) ≈ 12.2
 
         print("Raw logit_scale:", self.logit_scale.item())
-        print("Exp logit_scale:", torch.clamp(self.logit_scale, max=4.5).exp())
+        print("Exp logit_scale:", logit_scale)
 
         image_features = self.image_encoder(image.type(self.dtype))
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
@@ -80,7 +80,20 @@ class CustomCLIPCoOp(nn.Module):
         prompts = self.prompt_learner()
         text_features = self.text_encoder(prompts, self.tokenized_prompts)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-
+        if torch.isnan(image_features).any():
+            print("⚠️ NaNs in image_features!")
+        
+        if torch.isnan(text_features).any():
+            print("⚠️ NaNs in text_features!")
+        
+        if torch.isinf(image_features).any():
+            print("⚠️ Infs in image_features!")
+        
+        if torch.isinf(text_features).any():
+            print("⚠️ Infs in text_features!")
+        
+        print("Image feature norm:", image_features.norm(dim=-1).mean().item())
+        print("Text feature norm:", text_features.norm(dim=-1).mean().item())
         logits = logit_scale * image_features @ text_features.t()
 
         if self.prompt_learner.training and label is not None:
