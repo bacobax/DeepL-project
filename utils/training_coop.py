@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
+from torch.nn import functional as F
 
 from model.coop.custom_clip import CustomCLIPCoOp
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
@@ -65,8 +66,12 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         targets = targets.to(device)
 
         # Forward pass + loss computation
-        loss = model(inputs, targets)
         logits = model(inputs)
+        loss = F.cross_entropy(logits, targets)
+        if torch.isnan(loss):
+            print("⚠️ NaN loss encountered!")
+            print("Logits:", logits)
+            print("Targets:", targets)
 
         # Backward pass
         loss.backward()
