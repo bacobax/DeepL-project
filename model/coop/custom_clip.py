@@ -104,20 +104,22 @@ class CustomCLIPCoOp(nn.Module):
         prompts = self.prompt_learner()
         text_features = self.text_encoder(prompts, self.tokenized_prompts)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
         if torch.isnan(image_features).any():
             print("⚠️ NaNs in image_features!")
-        
+
         if torch.isnan(text_features).any():
             print("⚠️ NaNs in text_features!")
-        
+
         if torch.isinf(image_features).any():
             print("⚠️ Infs in image_features!")
-        
+
         if torch.isinf(text_features).any():
             print("⚠️ Infs in text_features!")
-        
+
         print("Image feature norm:", image_features.norm(dim=-1).mean().item())
         print("Text feature norm:", text_features.norm(dim=-1).mean().item())
+
         logits = logit_scale * image_features @ text_features.t()
 
         if self.prompt_learner.training and label is not None:
