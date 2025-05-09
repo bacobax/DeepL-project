@@ -38,7 +38,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
         images = images.to(device)
         targets = targets.to(device)
 
-        loss, logits = model(images)
+        loss, logits = model(images, targets)
 
         total_loss += loss.item() * targets.size(0)
         predictions = logits.argmax(dim=-1)
@@ -64,10 +64,10 @@ def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device=
         inputs = inputs.to(device)
         targets = targets.to(device)
         # debug if inputs and targets are taken correctly by the dataloader
-        print(inputs.shape)
-        print(targets.shape)
+        #print(inputs.shape)
+        #print(targets.shape)
         # Forward pass + loss computation
-        loss, logits = model(inputs)
+        loss, logits = model(inputs, targets)
 
         if torch.isnan(loss):
             print("⚠️ NaN loss encountered!")

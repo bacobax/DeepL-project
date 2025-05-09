@@ -48,6 +48,7 @@ class CoOpSystem:
 
         self.clip_model, preprocess = clip.load("RN50", device=self.device)
         self.clip_model = self.clip_model.to(self.device)
+        self.clip_model = self.clip_model.float()
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
 
         # split classes into base and novel

@@ -11,6 +11,7 @@ class TextEncoder(nn.Module):
         self.positional_embedding = clip_model.positional_embedding
         self.ln_final = clip_model.ln_final
         self.text_projection = clip_model.text_projection
+        self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
         x = prompts + self.positional_embedding
@@ -18,10 +19,13 @@ class TextEncoder(nn.Module):
         x = self.transformer(x)
         x = x.permute(1, 0, 2)  # [n_ctx, batch_size, transformer.width] -> [batch_size, n_ctx, transformer.width]
         x = self.ln_final(x)
+        if torch.isnan(x).any():
+            print("DSFSADSDFA")
 
         # Take features from the eot embedding (eot_token is the highest number in each sequence)
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
 
+        
 
         return x
 
@@ -50,8 +54,8 @@ class PromptLearnerCoOp(nn.Module):
             nn.init.normal_(ctx_vectors, std=0.02)
             prompt_prefix = " ".join(["X"] * n_ctx)
 
-        print(f'Initial context: "{prompt_prefix}"')
-        print(f"Number of context words (tokens): {n_ctx}")
+        #print(f'Initial context: "{prompt_prefix}"')
+        #print(f"Number of context words (tokens): {n_ctx}")
 
         self.ctx = nn.Parameter(ctx_vectors)
 
@@ -86,19 +90,20 @@ class CustomCLIPCoOp(nn.Module):
         self.image_encoder = clip_model.visual
         self.text_encoder = TextEncoder(clip_model)
         self.logit_scale = clip_model.logit_scale
+        
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
         logit_scale = self.logit_scale.exp()
 
-        print("Raw logit_scale:", self.logit_scale.item())
-        print("Exp logit_scale:", logit_scale)
+        #print("Raw logit_scale:", self.logit_scale.item())
+        #print("Exp logit_scale:", logit_scale)
 
         image_features = self.image_encoder(image.type(self.dtype))
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
         prompts = self.prompt_learner()
-        text_features = self.text_encoder(prompts, self.tokenized_prompts)
+        text_features = self.text_encoder(prompts.type(self.dtype), self.tokenized_prompts)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
         if torch.isnan(image_features).any():
@@ -113,12 +118,15 @@ class CustomCLIPCoOp(nn.Module):
         if torch.isinf(text_features).any():
             print("⚠️ Infs in text_features!")
 
-        print("Image feature norm:", image_features.norm(dim=-1).mean().item())
-        print("Text feature norm:", text_features.norm(dim=-1).mean().item())
+        #print("Image feature norm:", image_features.norm(dim=-1).mean().item())
+        #print("Text feature norm:", text_features.norm(dim=-1).mean().item())
 
         logits = logit_scale * image_features @ text_features.t()
 
-        if self.prompt_learner.training and label is not None:
+        #print(f"is training: {self.prompt_learner.training}, label: {label}")
+        
+        if label is not None:
+            
             return F.cross_entropy(logits, label), logits
 
         return logits
