@@ -93,7 +93,7 @@ class CoOpSystem:
 
     def train(self):
         print("Before training:")
-        self.compute_evaluation(-1, base=True)
+        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results

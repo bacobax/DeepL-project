@@ -8,7 +8,7 @@ ENV_NAME=deepl
 ENV_YAML=environment.yml
 PYTHON_SCRIPT=main.py  # <-- Replace with your actual entry point
 LOG_DIR=logs
-export DEVICE="mps"  # or "cpu" if no GPU available
+export DEVICE="cuda"  # or "cpu" if no GPU available
 export USING_COOP="true"
 # === Activate Conda ===
 echo "Activating Conda..."
