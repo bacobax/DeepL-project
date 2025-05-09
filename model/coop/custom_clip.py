@@ -70,6 +70,10 @@ class CustomCLIPCoOp(nn.Module):
 
     def forward(self, image, label=None):
         logit_scale = self.logit_scale.exp()
+
+        print("Raw logit_scale:", self.logit_scale.item())
+        print("Exp logit_scale:", self.logit_scale.exp().item())
+
         image_features = self.image_encoder(image.type(self.dtype))
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 

@@ -64,13 +64,15 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         # Load data into GPU
         inputs = inputs.to(device)
         targets = targets.to(device)
-
+        # debug if inputs and targets are taken correctly by the dataloader
+        print(inputs.shape)
+        print(targets.shape)
         # Forward pass + loss computation
         logits = model(inputs)
         loss = F.cross_entropy(logits, targets)
         if torch.isnan(loss):
             print("⚠️ NaN loss encountered!")
-            print("Logits:", logits)
+            #print("Logits:", logits)
             print("Targets:", targets)
 
         # Backward pass
