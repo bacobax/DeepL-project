@@ -25,16 +25,28 @@ class PromptLearner(nn.Module):
         ), f"cfg_imsize ({cfg_imsize}) must equal to clip_imsize ({clip_imsize})"
 
         if ctx_init:
-            # use given words to initialize context vectors
-            ctx_init = ctx_init.replace("_", " ")
-            n_ctx = len(ctx_init.split(" "))
-            prompt = clip.tokenize(ctx_init).to(
-                clip_model.token_embedding.weight.device
-            )
-            with torch.no_grad():
-                embedding = clip_model.token_embedding(prompt).type(dtype)
-            ctx_vectors = embedding[0, 1 : 1 + n_ctx, :]
-            prompt_prefix = ctx_init
+            if ctx_init == "RN50CoOp":
+                # use context vectors from RN50CoOp
+                checkpoint = torch.load(
+                    "RN50-COOP-weights/model.pth.tar-50", map_location="cpu"
+                )
+
+                # Extract the state dictionary
+                state_dict = checkpoint["state_dict"]
+
+                # Extract the context vectors
+                ctx_vectors = state_dict["ctx"]
+            else:
+                # use given words to initialize context vectors
+                ctx_init = ctx_init.replace("_", " ")
+                n_ctx = len(ctx_init.split(" "))
+                prompt = clip.tokenize(ctx_init).to(
+                    clip_model.token_embedding.weight.device
+                )
+                with torch.no_grad():
+                    embedding = clip_model.token_embedding(prompt).type(dtype)
+                ctx_vectors = embedding[0, 1 : 1 + n_ctx, :]
+                prompt_prefix = ctx_init
         else:
             # random initialization
             ctx_vectors = torch.empty(n_ctx, ctx_dim, dtype=dtype)
