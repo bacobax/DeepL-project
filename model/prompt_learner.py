@@ -25,19 +25,17 @@ class PromptLearner(nn.Module):
         ), f"cfg_imsize ({cfg_imsize}) must equal to clip_imsize ({clip_imsize})"
 
         if ctx_init:
-            if ctx_init == "RN50CoOp":
-                # use context vectors from RN50CoOp
-                checkpoint = torch.load(
-                    "RN50-COOP-weights/model.pth.tar-50", map_location="cpu"
-                )
-
-                # Extract the state dictionary
+            if ctx_init == 'RN50CoOp':
+                print("using RN50-CoOp ctx_vector")
+                checkpoint = torch.load("RN50-COOP-weights/model.pth.tar-50", map_location="cpu", weights_only=False)
                 state_dict = checkpoint["state_dict"]
-
-                # Extract the context vectors
                 ctx_vectors = state_dict["ctx"]
+                prompt_prefix = " ".join(["X"] * n_ctx)
+                print("n_ctx from coop:",ctx_vectors.shape[0])
+                #n_ctx = ctx_vectors.shape[0]
             else:
                 # use given words to initialize context vectors
+                print("ctx_init given")
                 ctx_init = ctx_init.replace("_", " ")
                 n_ctx = len(ctx_init.split(" "))
                 prompt = clip.tokenize(ctx_init).to(
@@ -49,6 +47,7 @@ class PromptLearner(nn.Module):
                 prompt_prefix = ctx_init
         else:
             # random initialization
+            print("ctx_init empty")
             ctx_vectors = torch.empty(n_ctx, ctx_dim, dtype=dtype)
             nn.init.normal_(ctx_vectors, std=0.02)
             prompt_prefix = " ".join(["X"] * n_ctx)

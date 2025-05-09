@@ -17,10 +17,10 @@ if __name__ == "__main__":
         learning_rate=0.01,
         weight_decay=0.0005,
         momentum=0.9,
-        epochs=30,
+        epochs=35,
         run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         n_ctx=4,
-        ctx_init="",
+        ctx_init="RN50CoOp",
         class_token_position="end",
         csc=False,
     )
