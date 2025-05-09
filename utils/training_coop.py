@@ -4,8 +4,7 @@ import torch
 from tqdm import tqdm
 import clip
 
-from model.custom_clip import CustomCLIP
-from model.prompt_learner import PromptLearner
+from model.coop.custom_clip import CustomCLIPCoOp
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 
@@ -66,7 +65,8 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         targets = targets.to(device)
 
         # Forward pass + loss computation
-        logits, loss = model(inputs, targets)
+        loss = model(inputs, targets)
+        logits = model(inputs)
 
         # Backward pass
         loss.backward()
@@ -100,25 +100,23 @@ def test_step(model, dataset, new_classnames, batch_size, device, label="test", 
 
 
 @torch.no_grad()
-def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, device, label="test"):
+def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, label="test"):
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-    new_classnames = [CLASS_NAMES[c] for c in new_classnames]
-    with model.temporary_classnames(new_classnames):
-        correct = 0
-        total = 0
+    correct = 0
+    total = 0
 
-        for images, targets in tqdm(dataloader, desc=label):
-            images = images.to(device)
-            targets = targets.to(device)
+    for images, targets in tqdm(dataloader, desc=label):
+        images = images.to(device)
+        targets = targets.to(device)
 
-            logits = model(images)
-            predictions = logits.argmax(dim=-1)
+        logits = model(images)
+        predictions = logits.argmax(dim=-1)
 
-            correct += (predictions == targets).sum().item()
-            total += targets.size(0)
+        correct += (predictions == targets).sum().item()
+        total += targets.size(0)
 
     accuracy = correct / total
     return accuracy

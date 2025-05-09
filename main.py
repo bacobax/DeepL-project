@@ -1,4 +1,5 @@
-from training_system import CoCoOpSystem
+from training_systems.cocoop import CoCoOpSystem
+from training_systems.coop import CoOpSystem
 import torch
 import os
 from datetime import datetime
@@ -10,9 +11,15 @@ if __name__ == "__main__":
     if torch.backends.mps.is_available():
         print("⚠️ Forcing float32 due to MPS limitations")
         torch.set_default_dtype(torch.float32)
-    train_sys = CoCoOpSystem(
+
+    use_coop = os.getenv("USING_COOP", "false").lower() in ("1", "true")
+
+    print(f"Using {'CoOp' if use_coop else 'CoCoOp'} for training")
+
+    train_cls = CoOpSystem if use_coop else CoCoOpSystem
+
+    train_sys = train_cls(
         batch_size=16,
-        num_classes=10,
         device=device,
         learning_rate=0.01,
         weight_decay=0.0005,

@@ -1,18 +1,9 @@
-import os.path as osp
-from collections import OrderedDict
-import math
 from contextlib import contextmanager
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.cuda.amp import GradScaler, autocast
-from model.prompt_learner import PromptLearner
-from clip import clip
-from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
-from easydict import EasyDict
-
-_tokenizer = _Tokenizer()
+from model.cocoop.prompt_learner import PromptLearner
 
 
 class TextEncoder(nn.Module):

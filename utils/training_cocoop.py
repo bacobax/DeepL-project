@@ -9,7 +9,7 @@ from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 
 @torch.no_grad()
-def eval_step(model, dataset, cost_function, batch_size=32, device="cuda"):
+def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None):
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -18,8 +18,22 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda"):
     total_loss = 0.0
     correct = 0
     total = 0
+    if new_classnames is not None:
+        new_classnames = [CLASS_NAMES[c] for c in new_classnames]
+        with model.temporary_classnames(new_classnames):
+            correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
+                                                          total_loss)
 
-    for images, targets in tqdm(dataloader, desc="Validation"):
+    else:
+        correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
+                                                      total_loss)
+    avg_loss = total_loss / total
+    accuracy = correct / total
+    return avg_loss, accuracy
+
+
+def walk_the_dataset(correct, cost_function, dataloader, device, model, total, total_loss):
+    for images, targets in tqdm(dataloader, desc="Validation", position=1, leave=False):
         images = images.to(device)
         targets = targets.to(device)
 
@@ -30,10 +44,7 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda"):
         predictions = logits.argmax(dim=-1)
         correct += (predictions == targets).sum().item()
         total += targets.size(0)
-
-    avg_loss = total_loss / total
-    accuracy = correct / total
-    return avg_loss, accuracy
+    return correct, total, total_loss
 
 
 def training_step(model, dataset, optimizer, batch_size, device="cuda"):
@@ -47,7 +58,7 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-    pbar = tqdm(dataloader, desc="Training", position=0, leave=True)
+    pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
     for batch_idx, (inputs, targets) in enumerate(dataloader):
         # Load data into GPU
         inputs = inputs.to(device)
@@ -73,10 +84,10 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         # Compute training accuracy
         cumulative_accuracy += predicted.eq(targets).sum().item()
 
-        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy / samples * 100)
+        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy / samples )
         pbar.update(1)
 
-    return cumulative_loss / samples, cumulative_accuracy / samples * 100
+    return cumulative_loss / samples, cumulative_accuracy / samples
 
 
 @torch.no_grad()

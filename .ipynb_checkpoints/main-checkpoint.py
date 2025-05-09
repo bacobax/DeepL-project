@@ -1,4 +1,4 @@
-from training_system import CoCoOpSystem
+from training_systems.cocoop import CoCoOpSystem
 import torch
 import os
 if __name__ == "__main__":

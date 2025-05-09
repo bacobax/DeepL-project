@@ -4,19 +4,18 @@ import torch
 from easydict import EasyDict
 from tqdm import tqdm
 
-from model.custom_clip import CustomCLIP
-from utils.datasets import  get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training import test_step, training_step, eval_step
+from model.cocoop.custom_clip import CustomCLIP
+from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+from utils.training_cocoop import test_step, training_step, eval_step
 import clip
 from torch.utils.tensorboard import SummaryWriter
-from torch.optim import SGD
+from torch.optim import SGD, Adam, AdamW
 from torch import nn
 
 
 class CoCoOpSystem:
     def __init__(self,
                  batch_size=16,
-                 num_classes=10,
                  device="cuda:0",
                  learning_rate=0.002,
                  weight_decay=0.0005,
@@ -29,7 +28,6 @@ class CoCoOpSystem:
                  csc=False,
                  ):
         self.batch_size = batch_size
-        self.num_classes = num_classes
         self.device = device
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -42,7 +40,7 @@ class CoCoOpSystem:
         self.csc = csc
 
         # Create a logger for the experiment
-        self.writer = SummaryWriter(log_dir=f"runs/{run_name}")
+        self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
         self.writer.add_scalar(f"lr", self.learning_rate, 0)
         self.writer.add_scalar(f"momentum", self.momentum, 0)
 
@@ -136,7 +134,7 @@ class CoCoOpSystem:
 
         self.save_model()
 
-    def save_model(self, path="./bin"):
+    def save_model(self, path="./cocoop/bin"):
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
@@ -159,11 +157,11 @@ class CoCoOpSystem:
         return base_accuracy, novel_accuracy
 
     def get_optimizer(self, lr, wd, momentum):
-        optimizer = SGD([
+        optimizer = Adam([
             {
                 "params": self.model.parameters()
             }
-        ], lr=lr, weight_decay=wd, momentum=momentum)
+        ], lr=lr, weight_decay=wd)
 
         return optimizer
 
