@@ -11,26 +11,18 @@ class TextEncoder(nn.Module):
         self.positional_embedding = clip_model.positional_embedding
         self.ln_final = clip_model.ln_final
         self.text_projection = clip_model.text_projection
-        self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
-        """
-        prompts: [B * n_cls, ctx_len, dim]
-        tokenized_prompts: [n_cls, ctx_len] or [B * n_cls, ctx_len]
-        """
-        x = prompts + self.positional_embedding.type(self.dtype)
-        x = x.permute(1, 0, 2)  # [ctx_len, B * n_cls, dim]
+        x = prompts + self.positional_embedding
+        x = x.permute(1, 0, 2)  # [batch_size, n_ctx, transformer.width] -> [n_ctx, batch_size, transformer.width]
         x = self.transformer(x)
-        x = x.permute(1, 0, 2)  # [B * n_cls, ctx_len, dim]
-        x = self.ln_final(x).type(self.dtype)
+        x = x.permute(1, 0, 2)  # [n_ctx, batch_size, transformer.width] -> [batch_size, n_ctx, transformer.width]
+        x = self.ln_final(x)
 
-        # Safe [EOT] selection
-        eot_token_id = 49407
-        if tokenized_prompts.ndim == 2:
-            tokenized_prompts = tokenized_prompts.repeat(prompts.shape[0] // tokenized_prompts.shape[0], 1)
-        eot_positions = (tokenized_prompts == eot_token_id).nonzero(as_tuple=False)
-        eot_positions = eot_positions[eot_positions[:, 0].argsort()]
-        x = x[torch.arange(x.shape[0]), eot_positions[:, 1]] @ self.text_projection
+        # Take features from the eot embedding (eot_token is the highest number in each sequence)
+        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
+
+
         return x
 
 class PromptLearnerCoOp(nn.Module):
@@ -97,7 +89,7 @@ class CustomCLIPCoOp(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
-        logit_scale = self.logit_scale.exp().item()  # exp(2.5) ≈ 12.2
+        logit_scale = self.logit_scale.exp()
 
         print("Raw logit_scale:", self.logit_scale.item())
         print("Exp logit_scale:", logit_scale)
@@ -127,6 +119,6 @@ class CustomCLIPCoOp(nn.Module):
         logits = logit_scale * image_features @ text_features.t()
 
         if self.prompt_learner.training and label is not None:
-            return F.cross_entropy(logits, label)
+            return F.cross_entropy(logits, label), logits
 
         return logits
