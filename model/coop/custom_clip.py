@@ -2,8 +2,32 @@ import clip
 import torch
 from torch import nn
 from torch.nn import functional as F
-from model.cocoop.custom_clip import TextEncoder
 
+
+class TextEncoder(nn.Module):
+    def __init__(self, clip_model):
+        super().__init__()
+        self.transformer = clip_model.transformer
+        self.positional_embedding = clip_model.positional_embedding
+        self.ln_final = clip_model.ln_final
+        self.text_projection = clip_model.text_projection
+        self.dtype = clip_model.dtype
+
+    def forward(self, prompts, tokenized_prompts):
+        x = prompts + self.positional_embedding.type(self.dtype)
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+        x = self.ln_final(x).type(self.dtype)
+
+        # x.shape = [batch_size, n_ctx, transformer.width]
+        # take features from the eot embedding (eot_token is the highest number in each sequence)
+        eot_token_id = 49407
+        eot_positions = (tokenized_prompts == eot_token_id).nonzero(as_tuple=False)
+        eot_positions = eot_positions[eot_positions[:, 0].argsort()]
+        x = x[torch.arange(x.shape[0]), eot_positions[:, 1]] @ self.text_projection
+
+        return x
 
 class PromptLearnerCoOp(nn.Module):
     def __init__(self, cfg, classnames, clip_model):
@@ -87,4 +111,3 @@ class CustomCLIPCoOp(nn.Module):
             return F.cross_entropy(logits, label)
 
         return logits
-
