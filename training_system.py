@@ -133,9 +133,15 @@ class CoCoOpSystem:
 
                 self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
-                self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
+                self.log_values(
+                    e, novel_val_loss, novel_val_accuracy, "validation_novel"
+                )
 
-                pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+                pbar.set_postfix(
+                    train_acc=base_train_accuracy,
+                    val_acc=base_val_accuracy,
+                    novel_val_acc=novel_val_accuracy,
+                )
             pbar.update(1)
 
         print("After training:")
@@ -145,7 +151,7 @@ class CoCoOpSystem:
         self.save_model()
 
     def save_model(self, path="./bin"):
-        #create folder if not exist
+        # create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
         # Save the model
@@ -153,7 +159,9 @@ class CoCoOpSystem:
 
     def load_model(self, path="./bin"):
         # Load the model
-        self.model.load_state_dict(torch.load(os.path.join(path, f"{self.run_name}.pth")))
+        self.model.load_state_dict(
+            torch.load(os.path.join(path, f"{self.run_name}.pth"))
+        )
         self.model.eval()
         print(f"Model loaded from {path}")
 
