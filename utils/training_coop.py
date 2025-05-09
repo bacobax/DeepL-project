@@ -38,8 +38,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
         images = images.to(device)
         targets = targets.to(device)
 
-        logits = model(images)
-        loss = cost_function(logits, targets)
+        loss, logits = model(images)
 
         total_loss += loss.item() * targets.size(0)
         predictions = logits.argmax(dim=-1)
@@ -48,7 +47,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
     return correct, total, total_loss
 
 
-def training_step(model, dataset, optimizer, batch_size, device="cuda"):
+def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device="cuda"):
     samples = 0.0
     cumulative_loss = 0.0
     cumulative_accuracy = 0.0
@@ -68,8 +67,8 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         print(inputs.shape)
         print(targets.shape)
         # Forward pass + loss computation
-        logits = model(inputs)
-        loss = F.cross_entropy(logits, targets)
+        loss, logits = model(inputs)
+
         if torch.isnan(loss):
             print("⚠️ NaN loss encountered!")
             #print("Logits:", logits)
