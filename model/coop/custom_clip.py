@@ -25,8 +25,7 @@ class TextEncoder(nn.Module):
         eot_token_id = 49407
         eot_positions = (tokenized_prompts == eot_token_id).nonzero(as_tuple=False)
         eot_positions = eot_positions[eot_positions[:, 0].argsort()]
-        x = x[torch.arange(x.shape[0]), eot_positions[:, 1]] @ self.text_projection
-
+        x = x[:, -1, :] @ self.text_projection
         return x
 
 class PromptLearnerCoOp(nn.Module):
