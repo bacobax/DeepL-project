@@ -82,7 +82,7 @@ class CustomCLIP(nn.Module):
 
         # image: [B, 3, H, W]
         # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
-        image_features = self.image_encoder(image.type(self.dtype))
+        image_features = self.image_encoder(image.type(self.dtype)).type(self.dtype)
 
         # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
@@ -97,7 +97,7 @@ class CustomCLIP(nn.Module):
             # pts_i: [num_classes, context_length, D]
             # tokenized_prompts: [num_classes, context_length]
             # text_features: [num_classes, D]
-            text_features = self.text_encoder(pts_i, tokenized_prompts)
+            text_features = self.text_encoder(pts_i, tokenized_prompts.type(self.dtype)).type(self.dtype)
 
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)

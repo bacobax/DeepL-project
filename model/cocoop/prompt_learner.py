@@ -1,5 +1,5 @@
 from collections import OrderedDict
-
+import os
 import torch
 import torch.nn as nn
 from clip import clip
@@ -15,6 +15,7 @@ class PromptLearner(nn.Module):
         n_ctx = cfg.TRAINER.COCOOP.N_CTX
         ctx_init = cfg.TRAINER.COCOOP.CTX_INIT
         dtype = clip_model.dtype
+        self.dtype=dtype
         ctx_dim = clip_model.ln_final.weight.shape[0]
         vis_dim = clip_model.visual.output_dim
 
@@ -41,7 +42,21 @@ class PromptLearner(nn.Module):
         print(f"Number of context words (tokens): {n_ctx}")
 
         self.ctx = nn.Parameter(ctx_vectors)
-
+        # Optional: Load pre-trained ctx from a file
+        if hasattr(cfg.TRAINER.COCOOP, "CTX_LOAD") and cfg.TRAINER.COCOOP.CTX_LOAD:
+            ctx_path = cfg.TRAINER.COCOOP.CTX_LOAD
+            if os.path.isfile(ctx_path):
+                print(f"🔁 Loading ctx from: {ctx_path}")
+                state_dict = torch.load(ctx_path, map_location="cpu")
+                if "ctx" in state_dict:
+                    with torch.no_grad():
+                        self.ctx.copy_(state_dict["ctx"])
+                else:
+                    raise KeyError(f"'ctx' not found in {ctx_path}")
+            else:
+                raise FileNotFoundError(f"CTX_LOAD path not found: {ctx_path}")
+            print("PROMPT LEARNER LOADED FROM A COOP PRETRAINED ONE")
+        
         self.meta_net = nn.Sequential(OrderedDict([
             ("linear1", nn.Linear(vis_dim, vis_dim // 16)),
             ("relu", nn.ReLU(inplace=True)),
@@ -107,6 +122,7 @@ class PromptLearner(nn.Module):
     def forward(self, im_features):
         prefix = self.token_prefix
         suffix = self.token_suffix
+        im_features = im_features.to(next(self.meta_net.parameters()).dtype)
         ctx = self.ctx                     # (n_ctx, ctx_dim)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
 
@@ -120,7 +136,7 @@ class PromptLearner(nn.Module):
             ctx_i = ctx_shifted_i.unsqueeze(0).expand(self.n_cls, -1, -1) # (n_cls, n_ctx, ctx_dim)
             pts_i = self.construct_prompts(ctx_i, prefix, suffix)  # (n_cls, n_tkn, ctx_dim)
             prompts.append(pts_i)
-        prompts = torch.stack(prompts)
+        prompts = torch.stack(prompts).type(self.dtype)
         
         return prompts
 

@@ -139,7 +139,7 @@ def base_test_step(model: CLIP, dataset, categories, batch_size, device, label="
 
     # we can encode the text features once as they are shared for all images
     # therefore we do it outside the evaluation loop
-    text_features = model.encode_text(text_inputs)
+    text_features = model.encode_text(text_inputs).float()
     # and here we normalize them (standard pratice with CLIP)
     text_features /= text_features.norm(dim=-1, keepdim=True)
 
@@ -159,7 +159,7 @@ def base_test_step(model: CLIP, dataset, categories, batch_size, device, label="
         target = target.to(device)
 
         # forward image through CLIP image encoder
-        image_features = model.encode_image(image)
+        image_features = model.encode_image(image.type(torch.float32))
         # and normalize
         image_features /= image_features.norm(dim=-1, keepdim=True)
 

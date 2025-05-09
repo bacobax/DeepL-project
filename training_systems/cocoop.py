@@ -47,6 +47,7 @@ class CoCoOpSystem:
         # Get dataloaders
 
         self.clip_model, preprocess = clip.load("RN50")
+
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
 
         # split classes into base and novel
@@ -65,6 +66,7 @@ class CoCoOpSystem:
         # Training configuration
         cfg.TRAINER = EasyDict()
         cfg.TRAINER.COCOOP = EasyDict()
+        cfg.TRAINER.COCOOP.CTX_LOAD = "./bin/coop/exp1_ctx_only.pth"
         cfg.TRAINER.COCOOP.N_CTX = self.n_ctx  # Number of context tokens
         cfg.TRAINER.COCOOP.CTX_INIT = self.ctx_init  # Leave empty for random initialization
         cfg.TRAINER.COCOOP.PREC = "fp16"  # Precision for meta network
@@ -91,7 +93,7 @@ class CoCoOpSystem:
 
     def train(self):
         print("Before training:")
-        self.compute_evaluation(-1, base=True)
+        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results
@@ -148,8 +150,9 @@ class CoCoOpSystem:
         print(f"Model loaded from {path}")
 
     def compute_evaluation(self, epoch_idx, base=False):
-        base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
-        novel_accuracy = test_step(self.model if not base else self.clip_model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
+        base_model = self.model if not base else self.clip_model.float()
+        base_accuracy = test_step(base_model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
+        novel_accuracy = test_step(base_model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
         # Log to TensorBoard
         self.log_value(epoch_idx,  base_accuracy, "base_classes")
         self.log_value(epoch_idx,  novel_accuracy, "novel_classes")
