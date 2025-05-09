@@ -69,7 +69,7 @@ class CustomCLIPCoOp(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
-        logit_scale = self.logit_scale.exp()
+        logit_scale = torch.clamp(self.logit_scale, max=4.5).exp()
 
         print("Raw logit_scale:", self.logit_scale.item())
         print("Exp logit_scale:", self.logit_scale.exp().item())
