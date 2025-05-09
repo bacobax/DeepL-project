@@ -98,11 +98,11 @@ def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device=
 
 
 @torch.no_grad()
-def test_step(model, dataset, new_classnames, batch_size, device, label="test", base=False):
+def test_step(model, dataset, batch_size, device, label="test", base=False):
     if not base:
-        return finetuned_test_step(model, dataset, new_classnames, batch_size, device, label)
+        return finetuned_test_step(model, dataset, batch_size, device, label)
     else:
-        return base_test_step(model, dataset, new_classnames, batch_size, device, label)
+        return base_test_step(model, dataset, batch_size, device, label)
 
 
 @torch.no_grad()

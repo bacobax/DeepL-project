@@ -94,11 +94,15 @@ class CoOpSystem:
 
     def train(self):
         print("Before training:")
-        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
-        # For each epoch, train the network and then compute evaluation results
         pbar = tqdm(total=self.epochs, desc="OVERALL TRAINING", position=0, leave=True)
+    
+        best_val_acc = 0.0
+        patience = 5
+        counter = 0
+        best_model_state = None
+    
         for e in range(self.epochs):
             base_train_loss, base_train_accuracy = training_step(
                 model=self.model,
@@ -107,6 +111,7 @@ class CoOpSystem:
                 batch_size=self.batch_size,
                 device=self.device,
             )
+    
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
                     model=self.model,
@@ -115,28 +120,44 @@ class CoOpSystem:
                     device=self.device,
                     batch_size=self.batch_size,
                 )
-
+    
                 self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
-
+    
                 pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+    
+                # Early stopping check
+                if base_val_accuracy > best_val_acc:
+                    best_val_acc = base_val_accuracy
+                    counter = 0
+                    best_model_state = self.model.state_dict()
+                else:
+                    counter += 1
+                    if counter >= patience:
+                        print(f"Early stopping at epoch {e}, best validation accuracy: {best_val_acc:.4f}")
+                        break
+    
             pbar.update(1)
-
+    
+        # Restore best model if early stopped
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
+    
         print("After training:")
         self.compute_evaluation(self.epochs)
         self.writer.close()
-
+    
         self.save_model()
         self.save_prompt_learner()
 
-    def save_model(self, path="./coop/bin"):
+    def save_model(self, path="./bin/coop"):
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
         # Save the model
         torch.save(self.model.state_dict(), os.path.join(path, f"{self.run_name}.pth"))
 
-    def save_prompt_learner(self, path="./coop/bin"):
+    def save_prompt_learner(self, path="./bin/coop"):
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
@@ -150,7 +171,7 @@ class CoOpSystem:
         print(f"Model loaded from {path}")
 
     def compute_evaluation(self, epoch_idx, base=False):
-        base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
+        base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.batch_size, self.device, label="test", base=base)
         # Log to TensorBoard
         self.log_value(epoch_idx,  base_accuracy, "base_classes")
 
