@@ -105,8 +105,7 @@ class CustomCLIP(nn.Module):
 
             # imf_i: [D], text_features.T: [D, num_classes]
             # l_i: [num_classes], similarity scores between image and all class prompts
-            l_i = logit_scale * imf_i @ text_features.t()
-
+            l_i = logit_scale * imf_i.float() @ text_features.t().float()
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
 
@@ -117,6 +116,7 @@ class CustomCLIP(nn.Module):
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
+            logits = logits.float()
             print(logits.dtype, label.dtype)  # Should be float32 and long
             return logits, F.cross_entropy(logits.float(), label)
 
