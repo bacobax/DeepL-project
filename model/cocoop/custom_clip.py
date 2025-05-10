@@ -118,7 +118,7 @@ class CustomCLIP(nn.Module):
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
             print(logits.dtype, label.dtype)  # Should be float32 and long
-            return logits, F.cross_entropy(logits, label)
+            return logits, F.cross_entropy(logits.float(), label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
