@@ -121,15 +121,20 @@ class PromptLearner(nn.Module):
         suffix = self.token_suffix
         ctx = self.ctx                     # (n_ctx, ctx_dim)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
+        if bias.isnan().any():
+            raise ValueError("NaN detected in bias")
         bias = bias.unsqueeze(1)           # (batch, 1, ctx_dim)
         ctx = ctx.unsqueeze(0)             # (1, n_ctx, ctx_dim)
         ctx_shifted = ctx + bias           # (batch, n_ctx, ctx_dim)
-
+        if ctx_shifted.isnan().any():
+            raise ValueError("NaN detected in ctx_shifted")
         # Use instance-conditioned context tokens for all classes
         prompts = []
         for ctx_shifted_i in ctx_shifted:
             ctx_i = ctx_shifted_i.unsqueeze(0).expand(self.n_cls, -1, -1) # (n_cls, n_ctx, ctx_dim)
             pts_i = self.construct_prompts(ctx_i, prefix, suffix)  # (n_cls, n_tkn, ctx_dim)
+            if pts_i.isnan().any():
+                raise ValueError("NaN detected in pts_i")
             prompts.append(pts_i)
         prompts = torch.stack(prompts)
 
