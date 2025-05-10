@@ -109,7 +109,8 @@ class CustomCLIP(nn.Module):
         # logits: list of B tensors each of shape [num_classes]
         # stacked into a tensor of shape [B, num_classes]
         logits = torch.stack(logits)
-
+        if logits.isnan().any():
+            raise ValueError("NaN detected in logits")
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
