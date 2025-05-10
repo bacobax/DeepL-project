@@ -38,7 +38,7 @@ class PromptLearner(nn.Module):
 
 
         self.ctx = nn.Parameter(ctx_vectors)
-        self.ctx.data = self.ctx.data.to(dtype)
+
         # Optional: Load pre-trained ctx from a file
         if hasattr(cfg.TRAINER.COCOOP, "CTX_LOAD") and cfg.TRAINER.COCOOP.CTX_LOAD:
             ctx_path = cfg.TRAINER.COCOOP.CTX_LOAD
@@ -60,7 +60,7 @@ class PromptLearner(nn.Module):
             ("linear2", nn.Linear(vis_dim // 16, ctx_dim))
         ]))
 
-        if cfg.TRAINER.COCOOP.PREC == "fp16":
+        if cfg.TRAINER.COCOOP.PREC == "fp16" and not torch.backends.mps.is_available():
             self.meta_net.half()
         else:
             print("⚠️ Using float32 for meta_net due to MPS")
@@ -125,9 +125,6 @@ class PromptLearner(nn.Module):
         
         print("im_features stats", im_features.min().item(), im_features.max().item(), im_features.norm(dim=1).mean().item())
 
-        im_features = im_features / (im_features.norm(dim=-1, keepdim=True) + 1e-6)
-        im_features = im_features.to(torch.float32)
-        self.meta_net = self.meta_net.to(torch.float32)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
         if bias.isnan().any():
             raise ValueError("NaN detected in bias")

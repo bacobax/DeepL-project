@@ -1,9 +1,18 @@
+import os.path as osp
+from collections import OrderedDict
+import math
 from contextlib import contextmanager
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch.cuda.amp import GradScaler, autocast
 from model.cocoop.prompt_learner import PromptLearner
+from clip import clip
+from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
+from easydict import EasyDict
+
+_tokenizer = _Tokenizer()
 
 
 class TextEncoder(nn.Module):
@@ -16,19 +25,16 @@ class TextEncoder(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
-        prompts = prompts.type(self.dtype)
         x = prompts + self.positional_embedding.type(self.dtype)
-        x = x.permute(1, 0, 2)
+        x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
-        x = x.permute(1, 0, 2)
+        x = x.permute(1, 0, 2)  # LND -> NLD
         x = self.ln_final(x).type(self.dtype)
-        if torch.isnan(x).any():
-            raise ValueError("NaN before projection!")
-        
-        if torch.isnan(self.text_projection).any():
-            raise ValueError("NaN in text_projection!")
-        # Avoid potential precision overflow, preserve performance
+
+        # x.shape = [batch_size, n_ctx, transformer.width]
+        # take features from the eot embedding (eot_token is the highest number in each sequence)
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
+
         return x
 
 
