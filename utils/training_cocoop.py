@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
+from torch.cuda.amp import autocast, GradScaler
 
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
@@ -59,21 +60,21 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
+
+    scaler = GradScaler()
+
     for batch_idx, (inputs, targets) in enumerate(dataloader):
         # Load data into GPU
         inputs = inputs.to(device)
         targets = targets.to(device)
 
         # Forward pass + loss computation
-        logits, loss = model(inputs, targets)
+        with autocast():
+            logits, loss = model(inputs, targets)
 
-        # Backward pass
-        loss.backward()
-
-        # Parameters update
-        optimizer.step()
-
-        # Gradients reset
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
 
         # Fetch prediction and loss value

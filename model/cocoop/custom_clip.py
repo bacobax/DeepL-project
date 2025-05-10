@@ -16,17 +16,15 @@ class TextEncoder(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
-        prompts = prompts.float()
-        x = prompts + self.positional_embedding.float()
-        x = x.permute(1, 0, 2)  # NLD -> LND
-    
-        # force transformer to run in float32
-        with torch.autocast(device_type='cuda', dtype=torch.float32, enabled=True):
-            x = self.transformer(x)
-    
-        x = x.permute(1, 0, 2)  # LND -> NLD
-        x = self.ln_final(x).float()
-        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection.float()
+        prompts = prompts.type(self.dtype)
+        x = prompts + self.positional_embedding.type(self.dtype)
+        x = x.permute(1, 0, 2)
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)
+        x = self.ln_final(x)
+        # Avoid potential precision overflow, preserve performance
+        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)]
+        x = x @ self.text_projection
         return x
 
 
@@ -105,7 +103,7 @@ class CustomCLIP(nn.Module):
 
             # imf_i: [D], text_features.T: [D, num_classes]
             # l_i: [num_classes], similarity scores between image and all class prompts
-            l_i = logit_scale * imf_i.float() @ text_features.t().float()
+            l_i = logit_scale * (imf_i @ text_features.t())
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
 
@@ -118,7 +116,9 @@ class CustomCLIP(nn.Module):
             # logits: [B, num_classes], label: [B]
             logits = logits.float()
             print(logits.dtype, label.dtype)  # Should be float32 and long
-            return logits, F.cross_entropy(logits.float(), label)
+            logits = logits.float()
+            return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
+        logits = logits.float()
         return logits
