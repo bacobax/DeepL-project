@@ -42,6 +42,7 @@ class PromptLearner(nn.Module):
         print(f"Number of context words (tokens): {n_ctx}")
 
         self.ctx = nn.Parameter(ctx_vectors)
+        self.ctx.data = self.ctx.data.to(dtype)
         # Optional: Load pre-trained ctx from a file
         if hasattr(cfg.TRAINER.COCOOP, "CTX_LOAD") and cfg.TRAINER.COCOOP.CTX_LOAD:
             ctx_path = cfg.TRAINER.COCOOP.CTX_LOAD
@@ -56,7 +57,7 @@ class PromptLearner(nn.Module):
             else:
                 raise FileNotFoundError(f"CTX_LOAD path not found: {ctx_path}")
             print("PROMPT LEARNER LOADED FROM A COOP PRETRAINED ONE")
-        
+
         self.meta_net = nn.Sequential(OrderedDict([
             ("linear1", nn.Linear(vis_dim, vis_dim // 16)),
             ("relu", nn.ReLU(inplace=True)),
@@ -87,17 +88,18 @@ class PromptLearner(nn.Module):
                 dtype = torch.float32
 
             embedding = embedding.to(dtype)
+            dtype_embedding = embedding
         # These token vectors will be saved when in save_model(),
         # but they should be ignored in load_model() as we want to use
         # those computed using the current class names
-        self.register_buffer("token_prefix", embedding[:, :1, :])  # SOS
-        self.register_buffer("token_suffix", embedding[:, 1 + n_ctx :, :])  # CLS, EOS
+        self.register_buffer("token_prefix", dtype_embedding[:, :1, :])  # SOS
+        self.register_buffer("token_suffix", dtype_embedding[:, 1 + n_ctx :, :])  # CLS, EOS
 
         self.n_cls = n_cls
         self.n_ctx = n_ctx
         self.tokenized_prompts = tokenized_prompts  # torch.Tensor
         self.name_lens = name_lens
-    
+
     def construct_prompts(self, ctx, prefix, suffix, label=None):
         # dim0 is either batch_size (during training) or n_cls (during testing)
         # ctx: context tokens, with shape of (dim0, n_ctx, ctx_dim)
@@ -127,9 +129,10 @@ class PromptLearner(nn.Module):
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
 
         bias = bias.unsqueeze(1)           # (batch, 1, ctx_dim)
+        ctx = ctx.to(bias.dtype)
         ctx = ctx.unsqueeze(0)             # (1, n_ctx, ctx_dim)
         ctx_shifted = ctx + bias           # (batch, n_ctx, ctx_dim)
-        
+
         # Use instance-conditioned context tokens for all classes
         prompts = []
         for ctx_shifted_i in ctx_shifted:
@@ -137,6 +140,5 @@ class PromptLearner(nn.Module):
             pts_i = self.construct_prompts(ctx_i, prefix, suffix)  # (n_cls, n_tkn, ctx_dim)
             prompts.append(pts_i)
         prompts = torch.stack(prompts).type(self.dtype)
-        
-        return prompts
 
+        return prompts

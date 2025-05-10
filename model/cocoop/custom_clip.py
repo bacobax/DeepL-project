@@ -16,6 +16,7 @@ class TextEncoder(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
+        prompts = prompts.type(self.dtype)
         x = prompts + self.positional_embedding.type(self.dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
@@ -82,7 +83,7 @@ class CustomCLIP(nn.Module):
 
         # image: [B, 3, H, W]
         # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
-        image_features = self.image_encoder(image.type(self.dtype)).type(self.dtype)
+        image_features = self.image_encoder(image.type(self.dtype))
 
         # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
@@ -97,7 +98,7 @@ class CustomCLIP(nn.Module):
             # pts_i: [num_classes, context_length, D]
             # tokenized_prompts: [num_classes, context_length]
             # text_features: [num_classes, D]
-            text_features = self.text_encoder(pts_i, tokenized_prompts.type(self.dtype)).type(self.dtype)
+            text_features = self.text_encoder(pts_i.type(self.dtype), tokenized_prompts)
 
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
