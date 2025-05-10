@@ -92,7 +92,7 @@ class CoCoOpSystem:
 
     def train(self):
         print("Before training:")
-        #self.compute_evaluation(-1, base=True)
+        self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results
@@ -149,7 +149,7 @@ class CoCoOpSystem:
         print(f"Model loaded from {path}")
 
     def compute_evaluation(self, epoch_idx, base=False):
-        base_model = self.model if not base else self.clip_model.float()
+        base_model = self.model if not base else self.clip_model
         base_accuracy = test_step(base_model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
         novel_accuracy = test_step(base_model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
         # Log to TensorBoard
