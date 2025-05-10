@@ -159,11 +159,11 @@ class CoCoOpSystem:
         return base_accuracy, novel_accuracy
 
     def get_optimizer(self, lr, wd, momentum):
-        optimizer = Adam([
+        optimizer = SGD([
             {
                 "params": self.model.parameters()
             }
-        ], lr=lr, weight_decay=wd)
+        ], lr=lr, weight_decay=wd, momentum=momentum)
 
         return optimizer
 

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     train_sys = train_cls(
         batch_size=16,
         device=device,
-        learning_rate=5e-4,
+        learning_rate=0.002,
         weight_decay=0.0001,
         momentum=0.9,
         epochs=30,

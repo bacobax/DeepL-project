@@ -123,7 +123,7 @@ class PromptLearner(nn.Module):
         if im_features.isnan().any():
             raise ValueError("NaN in im_features before meta_net")
         
-        print("im_features stats", im_features.min().item(), im_features.max().item(), im_features.norm(dim=1).mean().item())
+        #print("im_features stats", im_features.min().item(), im_features.max().item(), im_features.norm(dim=1).mean().item())
 
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
         if bias.isnan().any():
