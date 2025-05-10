@@ -96,7 +96,8 @@ class CustomCLIP(nn.Module):
             # tokenized_prompts: [num_classes, context_length]
             # text_features: [num_classes, D]
             text_features = self.text_encoder(pts_i, tokenized_prompts)
-
+            if text_features.isnan().any():
+                raise ValueError("NaN detected in logits")
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
