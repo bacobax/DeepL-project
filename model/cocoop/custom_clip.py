@@ -117,6 +117,7 @@ class CustomCLIP(nn.Module):
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
+            print(logits.dtype, label.dtype)  # Should be float32 and long
             return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
