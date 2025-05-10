@@ -64,10 +64,10 @@ class PromptLearner(nn.Module):
             ("linear2", nn.Linear(vis_dim // 16, ctx_dim))
         ]))
 
-        # if cfg.TRAINER.COCOOP.PREC == "fp16" and not torch.backends.mps.is_available():
-        #     self.meta_net.half()
-        # else:
-        print("⚠️ Using float32 for meta_net due to MPS")
+        if cfg.TRAINER.COCOOP.PREC == "fp16" and not torch.backends.mps.is_available():
+            self.meta_net.half()
+        else:
+            print("⚠️ Using float32 for meta_net due to MPS")
 
         classnames = [name.replace("_", " ") for name in classnames]
         name_lens = [len(_tokenizer.encode(name)) for name in classnames]
