@@ -23,8 +23,7 @@ class TextEncoder(nn.Module):
         x = x.permute(1, 0, 2)
         x = self.ln_final(x).type(self.dtype)
         # Avoid potential precision overflow, preserve performance
-        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)]
-        x = x @ self.text_projection
+        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
         return x
 
 
@@ -103,7 +102,7 @@ class CustomCLIP(nn.Module):
 
             # imf_i: [D], text_features.T: [D, num_classes]
             # l_i: [num_classes], similarity scores between image and all class prompts
-            l_i = logit_scale * (imf_i @ text_features.t())
+            l_i = logit_scale * imf_i @ text_features.t()
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
 

@@ -15,10 +15,8 @@ class PromptLearner(nn.Module):
         n_ctx = cfg.TRAINER.COCOOP.N_CTX
         ctx_init = cfg.TRAINER.COCOOP.CTX_INIT
         dtype = clip_model.dtype
-        self.dtype=dtype
         ctx_dim = clip_model.ln_final.weight.shape[0]
         vis_dim = clip_model.visual.output_dim
-
         clip_imsize = clip_model.visual.input_resolution
         cfg_imsize = cfg.INPUT.SIZE[0]
         assert cfg_imsize == clip_imsize, f"cfg_imsize ({cfg_imsize}) must equal to clip_imsize ({clip_imsize})"
@@ -62,7 +60,7 @@ class PromptLearner(nn.Module):
             ("linear2", nn.Linear(vis_dim // 16, ctx_dim))
         ]))
 
-        if cfg.TRAINER.COCOOP.PREC == "fp16" and not torch.backends.mps.is_available():
+        if cfg.TRAINER.COCOOP.PREC == "fp16":
             self.meta_net.half()
         else:
             print("⚠️ Using float32 for meta_net due to MPS")
@@ -123,9 +121,7 @@ class PromptLearner(nn.Module):
         suffix = self.token_suffix
         ctx = self.ctx                     # (n_ctx, ctx_dim)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
-
         bias = bias.unsqueeze(1)           # (batch, 1, ctx_dim)
-        ctx = ctx.to(bias.dtype)
         ctx = ctx.unsqueeze(0)             # (1, n_ctx, ctx_dim)
         ctx_shifted = ctx + bias           # (batch, n_ctx, ctx_dim)
 
@@ -135,6 +131,6 @@ class PromptLearner(nn.Module):
             ctx_i = ctx_shifted_i.unsqueeze(0).expand(self.n_cls, -1, -1) # (n_cls, n_ctx, ctx_dim)
             pts_i = self.construct_prompts(ctx_i, prefix, suffix)  # (n_cls, n_tkn, ctx_dim)
             prompts.append(pts_i)
-        prompts = torch.stack(prompts).type(self.dtype)
+        prompts = torch.stack(prompts)
 
         return prompts
