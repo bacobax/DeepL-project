@@ -24,7 +24,7 @@ if __name__ == "__main__":
         learning_rate=5e-4,
         weight_decay=0.0001,
         momentum=0.9,
-        epochs=1,
+        epochs=30,
         run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         n_ctx=4,
         ctx_init="",

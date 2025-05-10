@@ -81,13 +81,16 @@ class CustomCLIP(nn.Module):
         # image: [B, 3, H, W]
         # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
         image_features = self.image_encoder(image.type(self.dtype))
-
+        if image_features.isnan().any():
+            raise ValueError("NaN detected in image_features.")
         # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
         prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
+        if prompts.isnan().any():
+            raise ValueError("NaN detected in prompts.")
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
         # Iterate over batch
@@ -97,7 +100,7 @@ class CustomCLIP(nn.Module):
             # text_features: [num_classes, D]
             text_features = self.text_encoder(pts_i, tokenized_prompts)
             if text_features.isnan().any():
-                raise ValueError("NaN detected in logits")
+                raise ValueError("NaN detected in text ft.")
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
