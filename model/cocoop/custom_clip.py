@@ -22,6 +22,11 @@ class TextEncoder(nn.Module):
         x = self.transformer(x)
         x = x.permute(1, 0, 2)
         x = self.ln_final(x).type(self.dtype)
+        if torch.isnan(x).any():
+            raise ValueError("NaN before projection!")
+        
+        if torch.isnan(self.text_projection).any():
+            raise ValueError("NaN in text_projection!")
         # Avoid potential precision overflow, preserve performance
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
         return x

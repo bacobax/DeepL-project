@@ -120,6 +120,14 @@ class PromptLearner(nn.Module):
         prefix = self.token_prefix
         suffix = self.token_suffix
         ctx = self.ctx                     # (n_ctx, ctx_dim)
+        if im_features.isnan().any():
+            raise ValueError("NaN in im_features before meta_net")
+        
+        print("im_features stats", im_features.min().item(), im_features.max().item(), im_features.norm(dim=1).mean().item())
+
+        im_features = im_features / (im_features.norm(dim=-1, keepdim=True) + 1e-6)
+        im_features = im_features.to(torch.float32)
+        self.meta_net = self.meta_net.to(torch.float32)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
         if bias.isnan().any():
             raise ValueError("NaN detected in bias")
