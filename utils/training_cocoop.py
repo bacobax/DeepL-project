@@ -70,6 +70,8 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
         loss.backward()
 
+        optimizer.step()
+
         optimizer.zero_grad()
 
         # Fetch prediction and loss value
