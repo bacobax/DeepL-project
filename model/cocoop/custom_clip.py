@@ -21,7 +21,7 @@ class TextEncoder(nn.Module):
         x = x.permute(1, 0, 2)
         x = self.transformer(x)
         x = x.permute(1, 0, 2)
-        x = self.ln_final(x)
+        x = self.ln_final(x).type(self.dtype)
         # Avoid potential precision overflow, preserve performance
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)]
         x = x @ self.text_projection
@@ -96,7 +96,7 @@ class CustomCLIP(nn.Module):
             # pts_i: [num_classes, context_length, D]
             # tokenized_prompts: [num_classes, context_length]
             # text_features: [num_classes, D]
-            text_features = self.text_encoder(pts_i.type(self.dtype), tokenized_prompts)
+            text_features = self.text_encoder(pts_i, tokenized_prompts)
 
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
@@ -114,11 +114,8 @@ class CustomCLIP(nn.Module):
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
-            logits = logits.float()
-            print(logits.dtype, label.dtype)  # Should be float32 and long
-            logits = logits.float()
+
             return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
-        logits = logits.float()
         return logits

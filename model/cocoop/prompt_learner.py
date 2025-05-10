@@ -38,8 +38,6 @@ class PromptLearner(nn.Module):
             nn.init.normal_(ctx_vectors, std=0.02)
             prompt_prefix = " ".join(["X"] * n_ctx)
 
-        print(f'Initial context: "{prompt_prefix}"')
-        print(f"Number of context words (tokens): {n_ctx}")
 
         self.ctx = nn.Parameter(ctx_vectors)
         self.ctx.data = self.ctx.data.to(dtype)
@@ -88,12 +86,11 @@ class PromptLearner(nn.Module):
                 dtype = torch.float32
 
             embedding = embedding.to(dtype)
-            dtype_embedding = embedding
         # These token vectors will be saved when in save_model(),
         # but they should be ignored in load_model() as we want to use
         # those computed using the current class names
-        self.register_buffer("token_prefix", dtype_embedding[:, :1, :])  # SOS
-        self.register_buffer("token_suffix", dtype_embedding[:, 1 + n_ctx :, :])  # CLS, EOS
+        self.register_buffer("token_prefix", embedding[:, :1, :])  # SOS
+        self.register_buffer("token_suffix", embedding[:, 1 + n_ctx :, :])  # CLS, EOS
 
         self.n_cls = n_cls
         self.n_ctx = n_ctx
@@ -124,7 +121,6 @@ class PromptLearner(nn.Module):
     def forward(self, im_features):
         prefix = self.token_prefix
         suffix = self.token_suffix
-        im_features = im_features.to(next(self.meta_net.parameters()).dtype)
         ctx = self.ctx                     # (n_ctx, ctx_dim)
         bias = self.meta_net(im_features)  # (batch, ctx_dim)
 
