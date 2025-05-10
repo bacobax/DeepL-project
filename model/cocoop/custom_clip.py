@@ -16,17 +16,17 @@ class TextEncoder(nn.Module):
         self.dtype = clip_model.dtype
 
     def forward(self, prompts, tokenized_prompts):
-        prompts = prompts.type(self.dtype)
-        x = prompts + self.positional_embedding.type(self.dtype)
+        prompts = prompts.float()
+        x = prompts + self.positional_embedding.float()
         x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.transformer(x)
+    
+        # force transformer to run in float32
+        with torch.autocast(device_type='cuda', dtype=torch.float32, enabled=True):
+            x = self.transformer(x)
+    
         x = x.permute(1, 0, 2)  # LND -> NLD
-        x = self.ln_final(x).type(self.dtype)
-
-        # x.shape = [batch_size, n_ctx, transformer.width]
-        # take features from the eot embedding (eot_token is the highest number in each sequence)
-        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection
-
+        x = self.ln_final(x).float()
+        x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)] @ self.text_projection.float()
         return x
 
 
