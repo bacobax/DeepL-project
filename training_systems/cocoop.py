@@ -55,7 +55,7 @@ class CoCoOpSystem:
 
         # Get dataloaders
 
-        self.clip_model, preprocess = clip.load("RN50")
+        self.clip_model, preprocess = clip.load("ViT-B/32")
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
 
         # split classes into base and novel
