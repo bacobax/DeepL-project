@@ -13,7 +13,7 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_c
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
-    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     total_loss = 0.0
     correct = 0
@@ -57,7 +57,7 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
     model.train()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
-    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
     for batch_idx, (inputs, targets) in enumerate(dataloader):
         # Load data into GPU
@@ -103,7 +103,7 @@ def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, 
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
-    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     new_classnames = [CLASS_NAMES[c] for c in new_classnames]
     with model.temporary_classnames(new_classnames):
         correct = 0
