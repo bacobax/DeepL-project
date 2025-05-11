@@ -129,9 +129,9 @@ class CoCoOpSystem:
 
         best_novel_accuracy = 0.0
         patience_counter = 0
-        patience = 4  # adjustable
+        patience = 3# adjustable
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
-
+        c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
             base_train_loss, base_train_accuracy = training_step(
@@ -177,10 +177,11 @@ class CoCoOpSystem:
 
             pbar.update(1)
             self.lr_scheduler.step()
+            c += 1
 
         print("After training:")
         self.model.load_state_dict(torch.load(best_model_path))  # Load best model
-        self.compute_evaluation(e)
+        self.compute_evaluation(c)
         self.writer.close()
         self.save_model()
 
