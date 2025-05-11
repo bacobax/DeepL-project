@@ -100,7 +100,6 @@ class CoCoOpSystem:
         self.cost_function = nn.CrossEntropyLoss()
 
     def train(self):
-
         def lr_lambda(current_epoch):
             if current_epoch < self.warmup_epoch:
                 return self.warmup_cons_lr / self.learning_rate
@@ -114,7 +113,12 @@ class CoCoOpSystem:
         self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
-        # For each epoch, train the network and then compute evaluation results
+
+        best_novel_accuracy = 0.0
+        patience_counter = 0
+        patience = 4  # adjustable
+        best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
             base_train_loss, base_train_accuracy = training_step(
@@ -124,6 +128,7 @@ class CoCoOpSystem:
                 batch_size=self.batch_size,
                 device=self.device,
             )
+
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
                     model=self.model,
@@ -146,13 +151,24 @@ class CoCoOpSystem:
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 
                 pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+
+                if novel_val_accuracy > best_novel_accuracy:
+                    best_novel_accuracy = novel_val_accuracy
+                    patience_counter = 0
+                    torch.save(self.model.state_dict(), best_model_path)
+                else:
+                    patience_counter += 1
+                    if patience_counter >= patience:
+                        print(f"Stopping early at epoch {e} due to no improvement in novel accuracy.")
+                        break
+
             pbar.update(1)
             self.lr_scheduler.step()
 
         print("After training:")
-        self.compute_evaluation(self.epochs)
+        self.model.load_state_dict(torch.load(best_model_path))  # Load best model
+        self.compute_evaluation(e)
         self.writer.close()
-
         self.save_model()
 
     def save_model(self, path="./cocoop/bin"):
