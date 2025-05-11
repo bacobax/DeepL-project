@@ -49,9 +49,22 @@ class CoCoOpSystem:
 
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
-        self.writer.add_scalar(f"lr", self.learning_rate, 0)
-        self.writer.add_scalar(f"momentum", self.momentum, 0)
-        self.writer.add_scalar(f"batch_size", self.batch_size, 0)
+        self.writer.add_hparams({
+            "batch_size": self.batch_size,
+            "learning_rate": self.learning_rate,
+            "weight_decay": self.weight_decay,
+            "momentum": self.momentum,
+            "epochs": self.epochs,
+            "n_ctx": self.n_ctx,
+            "ctx_init": self.ctx_init,
+            "class_token_position": self.class_token_position,
+            "csc": self.csc,
+            "max_epoch": self.max_epoch,
+            "lr_scheduler_type": self.lr_scheduler_type,
+            "warmup_epoch": self.warmup_epoch,
+            "warmup_type": self.warmup_type,
+            "warmup_cons_lr": self.warmup_cons_lr
+        }, {})
 
         # Get dataloaders
 
@@ -171,7 +184,7 @@ class CoCoOpSystem:
         self.writer.close()
         self.save_model()
 
-    def save_model(self, path="./cocoop/bin"):
+    def save_model(self, path="./bin/cocoop"):
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
