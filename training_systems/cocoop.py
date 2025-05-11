@@ -41,7 +41,7 @@ class CoCoOpSystem:
         self.class_token_position = class_token_position
         self.csc = csc
 
-        self.max_epoch = 10
+        self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
         self.warmup_epoch = 1
         self.warmup_type = "constant"
@@ -115,8 +115,8 @@ class CoCoOpSystem:
         print("Training the model...")
         print_epoch_interval = 2
         # For each epoch, train the network and then compute evaluation results
-        pbar = tqdm(total=self.epochs, desc="OVERALL TRAINING", position=0, leave=True)
-        for e in range(self.epochs):
+        pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
+        for e in range(self.max_epoch):
             base_train_loss, base_train_accuracy = training_step(
                 model=self.model,
                 dataset=self.train_base,
