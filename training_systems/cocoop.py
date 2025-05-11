@@ -1,4 +1,5 @@
 import os
+import math
 
 import torch
 from easydict import EasyDict
@@ -11,6 +12,7 @@ import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
 from torch import nn
+from torch.optim.lr_scheduler import LambdaLR
 
 
 class CoCoOpSystem:
@@ -39,10 +41,17 @@ class CoCoOpSystem:
         self.class_token_position = class_token_position
         self.csc = csc
 
+        self.max_epoch = 10
+        self.lr_scheduler_type = "cosine"
+        self.warmup_epoch = 1
+        self.warmup_type = "constant"
+        self.warmup_cons_lr = 1e-5
+
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
         self.writer.add_scalar(f"lr", self.learning_rate, 0)
         self.writer.add_scalar(f"momentum", self.momentum, 0)
+        self.writer.add_scalar(f"batch_size", self.batch_size, 0)
 
         # Get dataloaders
 
@@ -91,6 +100,16 @@ class CoCoOpSystem:
         self.cost_function = nn.CrossEntropyLoss()
 
     def train(self):
+
+        def lr_lambda(current_epoch):
+            if current_epoch < self.warmup_epoch:
+                return self.warmup_cons_lr / self.learning_rate
+            else:
+                cosine_decay = 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch)))
+                return cosine_decay
+
+        self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
+
         print("Before training:")
         self.compute_evaluation(-1, base=True)
         print("Training the model...")
@@ -128,6 +147,7 @@ class CoCoOpSystem:
 
                 pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
             pbar.update(1)
+            self.lr_scheduler.step()
 
         print("After training:")
         self.compute_evaluation(self.epochs)
