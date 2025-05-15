@@ -137,7 +137,7 @@ class CoCoOpSystem:
         c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
-            base_train_loss, base_train_accuracy = training_step_v2(
+            base_train_total_loss, base_train_ce_accuracy, base_ce_loss, base_kl_loss = training_step_v2(
                 model=self.model,
                 dataset=self.train_base,
                 optimizer=self.optimizer,
@@ -163,11 +163,15 @@ class CoCoOpSystem:
                     new_classnames=self.novel_classes,
                 )
 
-                self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 
-                pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+                self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
+                self.writer.add_scalar(f"train_base/ce_accuracy", base_train_ce_accuracy, e)
+                self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
+                self.writer.add_scalar(f"train_base/total_loss", base_train_total_loss, e)
+
+                pbar.set_postfix(train_acc=base_train_ce_accuracy, val_acc=base_val_accuracy, train_total_loss=base_train_total_loss)
 
                 if novel_val_accuracy > best_novel_accuracy:
                     best_novel_accuracy = novel_val_accuracy

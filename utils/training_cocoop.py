@@ -48,8 +48,12 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
 
 def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="cuda"):
     samples = 0.0
+    kl_samples = 0.0
+    ce_samples = 0.0
     cumulative_loss = 0.0
     cumulative_accuracy = 0.0
+    cumulative_ce_loss = 0.0
+    cumulative_kl_loss = 0.0
 
     model.train()
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -111,21 +115,32 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
 
         # === Combine losses ===
         total_loss = loss_ce + lambda_kl * kl_loss
+
         optimizer.zero_grad()
         total_loss.backward()
         optimizer.step()
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
         cumulative_loss += total_loss.item() * batch_size_total
+        cumulative_ce_loss += loss_ce.item() * inputs_base.size(0)
+        cumulative_kl_loss += kl_loss.item() * inputs_novel.size(0)
+
+        samples += batch_size_total
+        ce_samples += inputs_base.size(0)
+        kl_samples += inputs_novel.size(0)
 
         _, predicted = logits_base.max(dim=1)
         cumulative_accuracy += predicted.eq(targets_base).sum().item()
-        samples += batch_size_total
 
         pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy/samples, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
 
-    return cumulative_loss / samples, cumulative_accuracy / samples
+    return (
+        cumulative_loss / samples,
+        cumulative_accuracy / ce_samples,
+        cumulative_ce_loss / ce_samples,
+        cumulative_kl_loss / kl_samples,
+    )
 
 
 def training_step(model, dataset, optimizer, batch_size, device="cuda"):
