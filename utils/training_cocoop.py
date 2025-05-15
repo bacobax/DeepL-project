@@ -154,6 +154,8 @@ def compute_ce_loss(model, dataset, batch_size, device="cuda"):
 
         logits, ce_loss = model(inputs, targets)  # ce_loss is a tensor
 
+        ce_loss.backward()
+
         # Accumulate loss tensor (weighted by batch size)
         all_ce_losses.append(ce_loss * inputs.size(0))
 
