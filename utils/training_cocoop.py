@@ -93,7 +93,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
             image_features_clip = model.clip_model.encode_image(inputs_novel)
             image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
 
-            category_idxs = [dataset.idx2cat[c] for c in targets_novel]
+            category_idxs = [tmp_dataset.idx2cat[c] for c in targets_novel]
 
             text_inputs = clip.tokenize(
                 [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in category_idxs]
