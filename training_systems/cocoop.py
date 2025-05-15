@@ -1,5 +1,6 @@
 import os
 import math
+import random
 
 import torch
 from easydict import EasyDict
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import test_step, training_step, eval_step
+from utils.training_cocoop import test_step, training_step, eval_step, compute_ce_loss, compute_kl_loss
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
@@ -28,6 +29,7 @@ class CoCoOpSystem:
                  ctx_init="",
                  class_token_position="end",
                  csc=False,
+                 lambda_kl=0.5,
                  ):
         self.batch_size = batch_size
         self.device = device
@@ -40,7 +42,7 @@ class CoCoOpSystem:
         self.ctx_init = ctx_init
         self.class_token_position = class_token_position
         self.csc = csc
-
+        self.lambda_kl = lambda_kl
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
         self.warmup_epoch = 1
@@ -63,7 +65,8 @@ class CoCoOpSystem:
             "lr_scheduler_type": self.lr_scheduler_type,
             "warmup_epoch": self.warmup_epoch,
             "warmup_type": self.warmup_type,
-            "warmup_cons_lr": self.warmup_cons_lr
+            "warmup_cons_lr": self.warmup_cons_lr,
+            "lambda_kl": self.lambda_kl,
         }, {})
 
         # Get dataloaders
@@ -134,13 +137,40 @@ class CoCoOpSystem:
         c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
-            base_train_loss, base_train_accuracy = training_step(
+            # --- Split base classes into pseudo-base and pseudo-novel ---
+            base_class_ids = list(self.base_classes)
+            random.shuffle(base_class_ids)
+            split_idx = int(0.7 * len(base_class_ids))
+            pseudo_base_ids = base_class_ids[:split_idx]
+            pseudo_novel_ids = base_class_ids[split_idx:]
+
+            # --- Generate datasets for each split ---
+            train_pseudo_base, _ = split_data(self.train_set, pseudo_base_ids)
+            train_pseudo_novel, _ = split_data(self.train_set, pseudo_novel_ids)
+
+            # --- Compute CE loss on pseudo-base (with gradient) ---
+            ce_loss_total, base_train_accuracy = compute_ce_loss(
                 model=self.model,
-                dataset=self.train_base,
-                optimizer=self.optimizer,
+                dataset=train_pseudo_base,
                 batch_size=self.batch_size,
-                device=self.device,
+                device=self.device
             )
+
+            # --- Compute KL loss on pseudo-novel (no gradient yet) ---
+            kl_loss_total = compute_kl_loss(
+                model=self.model,
+                clip_model=self.clip_model,
+                dataset=train_pseudo_novel,
+                pseudo_novel_class_ids=pseudo_novel_ids,
+                batch_size=self.batch_size,
+                device=self.device
+            )
+
+            # --- Total loss and optimization ---
+            total_loss = ce_loss_total + self.lambda_kl * kl_loss_total  # lambda_kl = 0.5
+            self.optimizer.zero_grad()
+            total_loss.backward()
+            self.optimizer.step()
 
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
@@ -159,7 +189,7 @@ class CoCoOpSystem:
                     new_classnames=self.novel_classes,
                 )
 
-                self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
+                self.log_values(e, ce_loss_total.item(), base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 

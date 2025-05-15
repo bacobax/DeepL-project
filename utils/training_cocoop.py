@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
-
+import torch.nn.functional as F
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
@@ -89,6 +89,83 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
     return cumulative_loss / samples, cumulative_accuracy / samples
 
+
+def compute_kl_loss(model, clip_model, dataset, pseudo_novel_class_ids, batch_size, device="cuda"):
+    model.eval()
+    clip_model.eval()
+
+    tmp_dataset = ContiguousLabelDataset(dataset)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
+    kl_losses = []
+    total_samples = 0
+
+    for images, _ in tqdm(dataloader, desc="KL Loss Accumulation", position=1, leave=False):
+        images = images.to(device)
+
+        # --- CLIP teacher prediction ---
+        with torch.no_grad():
+            image_features_clip = clip_model.encode_image(images)
+            image_features_clip /= image_features_clip.norm(dim=-1, keepdim=True)
+
+            text_inputs = clip.tokenize([
+                f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in pseudo_novel_class_ids
+            ]).to(device)
+
+            text_features_clip = clip_model.encode_text(text_inputs)
+            text_features_clip /= text_features_clip.norm(dim=-1, keepdim=True)
+
+            clip_logits = image_features_clip @ text_features_clip.T  # [B, |pseudo_novel|]
+
+        # --- Student model prediction ---
+        student_logits = model(images)  # [B, |all_classes|]
+
+        # Filter student logits to pseudo_novel subset
+        student_logits = student_logits[:, pseudo_novel_class_ids]
+
+        # --- KL Divergence ---
+        kl_loss = F.kl_div(
+            F.log_softmax(student_logits, dim=-1),
+            F.softmax(clip_logits, dim=-1),
+            reduction="batchmean"
+        )
+        kl_losses.append(kl_loss * images.size(0))
+        total_samples += images.size(0)
+
+    total_kl = torch.stack(kl_losses).sum() / total_samples
+    return total_kl
+
+
+def compute_ce_loss(model, dataset, batch_size, device="cuda"):
+    model.train()
+
+    ce_loss_total = 0.0
+    total_samples = 0
+    correct = 0
+
+    tmp_dataset = ContiguousLabelDataset(dataset)
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
+    all_ce_losses = []
+
+    for inputs, targets in tqdm(dataloader, desc="CE Loss Accumulation", position=1, leave=False):
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        logits, ce_loss = model(inputs, targets)  # ce_loss is a tensor
+
+        # Accumulate loss tensor (weighted by batch size)
+        all_ce_losses.append(ce_loss * inputs.size(0))
+
+        # Accuracy tracking (optional)
+        preds = logits.argmax(dim=1)
+        correct += (preds == targets).sum().item()
+        total_samples += inputs.size(0)
+
+    # Mean CE loss (preserving gradient graph)
+    ce_loss_total = torch.stack(all_ce_losses).sum() / total_samples
+    accuracy = correct / total_samples
+    return ce_loss_total, accuracy
 
 @torch.no_grad()
 def test_step(model, dataset, new_classnames, batch_size, device, label="test", base=False):
