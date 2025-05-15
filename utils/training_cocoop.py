@@ -129,6 +129,7 @@ def compute_kl_loss(model, clip_model, dataset, pseudo_novel_class_ids, batch_si
             F.softmax(clip_logits, dim=-1),
             reduction="batchmean"
         )
+        kl_loss.backward()
         kl_losses.append(kl_loss * images.size(0))
         total_samples += images.size(0)
 
