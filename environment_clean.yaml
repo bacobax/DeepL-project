@@ -1,0 +1,13 @@
+name: deepl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - ipykernel
+  - jupyter
+  - pandas
+  - numpy
+  - scikit-image
+  - tqdm
+  - plotly
+prefix: /Users/francescobassignana/miniforge3/envs/deepl

@@ -1,8 +1,8 @@
 from easydict import EasyDict
 
-from model.custom_clip import CustomCLIP
+from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import  get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training import test_step, training_step, eval_step
+from utils.training_cocoop import test_step, training_step, eval_step
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD

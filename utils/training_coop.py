@@ -3,9 +3,9 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
+from torch.nn import functional as F
 
-from model.custom_clip import CustomCLIP
-from model.prompt_learner import PromptLearner
+from model.coop.custom_clip import CustomCLIPCoOp
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 
@@ -38,8 +38,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
         images = images.to(device)
         targets = targets.to(device)
 
-        logits = model(images)
-        loss = cost_function(logits, targets)
+        loss, logits = model(images, targets)
 
         total_loss += loss.item() * targets.size(0)
         predictions = logits.argmax(dim=-1)
@@ -48,7 +47,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
     return correct, total, total_loss
 
 
-def training_step(model, dataset, optimizer, batch_size, device="cuda"):
+def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device="cuda"):
     samples = 0.0
     cumulative_loss = 0.0
     cumulative_accuracy = 0.0
@@ -64,9 +63,16 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         # Load data into GPU
         inputs = inputs.to(device)
         targets = targets.to(device)
-
+        # debug if inputs and targets are taken correctly by the dataloader
+        #print(inputs.shape)
+        #print(targets.shape)
         # Forward pass + loss computation
-        logits, loss = model(inputs, targets)
+        loss, logits = model(inputs, targets)
+
+        if torch.isnan(loss):
+            print("⚠️ NaN loss encountered!")
+            #print("Logits:", logits)
+            print("Targets:", targets)
 
         # Backward pass
         loss.backward()
@@ -92,33 +98,31 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
 
 @torch.no_grad()
-def test_step(model, dataset, new_classnames, batch_size, device, label="test", base=False):
+def test_step(model, dataset, batch_size, device, label="test", base=False):
     if not base:
-        return finetuned_test_step(model, dataset, new_classnames, batch_size, device, label)
+        return finetuned_test_step(model, dataset, batch_size, device, label)
     else:
-        return base_test_step(model, dataset, new_classnames, batch_size, device, label)
+        return base_test_step(model, dataset, batch_size, device, label)
 
 
 @torch.no_grad()
-def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, device, label="test"):
+def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, label="test"):
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-    new_classnames = [CLASS_NAMES[c] for c in new_classnames]
-    with model.temporary_classnames(new_classnames):
-        correct = 0
-        total = 0
+    correct = 0
+    total = 0
 
-        for images, targets in tqdm(dataloader, desc=label):
-            images = images.to(device)
-            targets = targets.to(device)
+    for images, targets in tqdm(dataloader, desc=label):
+        images = images.to(device)
+        targets = targets.to(device)
 
-            logits = model(images)
-            predictions = logits.argmax(dim=-1)
+        logits = model(images)
+        predictions = logits.argmax(dim=-1)
 
-            correct += (predictions == targets).sum().item()
-            total += targets.size(0)
+        correct += (predictions == targets).sum().item()
+        total += targets.size(0)
 
     accuracy = correct / total
     return accuracy
