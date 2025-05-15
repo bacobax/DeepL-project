@@ -65,8 +65,8 @@ class CoCoOpSystem:
             "lr_scheduler_type": self.lr_scheduler_type,
             "warmup_epoch": self.warmup_epoch,
             "warmup_type": self.warmup_type,
-            "warmup_cons_lr": self.warmup_cons_lr,
             "lambda_kl": self.lambda_kl,
+            "warmup_cons_lr": self.warmup_cons_lr,
         }, {})
 
         # Get dataloaders
@@ -126,13 +126,13 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         print("Before training:")
-        #self.compute_evaluation(-1, base=True)
+        self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
 
         best_novel_accuracy = 0.0
         patience_counter = 0
-        patience = 3# adjustable
+        patience = 4# adjustable
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
