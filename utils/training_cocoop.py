@@ -83,7 +83,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         inputs_base = torch.stack([img for img, _ in base_batch]).to(device)
         targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(device)
 
-        print(f"input base shape: {inputs_base.shape} target base: {targets_base.shape}")
+        #print(f"input base shape: {inputs_base.shape} target base: {targets_base.shape}")
         
         
         logits_base, loss_ce = model(inputs_base, targets_base)
@@ -96,7 +96,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
 
         categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
         
-        print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
+        #print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
         with torch.no_grad():
             image_features_clip = model.clip_model.encode_image(inputs_novel)
             image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
@@ -120,7 +120,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
 
         student_logits = torch.tensor(student_logits_tmp).to(device)
 
-        print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
+        #print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
         
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
