@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import test_step, training_step, eval_step
+from utils.training_cocoop import test_step, training_step, eval_step, training_step_v2
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
@@ -28,6 +28,7 @@ class CoCoOpSystem:
                  ctx_init="",
                  class_token_position="end",
                  csc=False,
+                 lambda_kl=0.5,
                  ):
         self.batch_size = batch_size
         self.device = device
@@ -40,6 +41,7 @@ class CoCoOpSystem:
         self.ctx_init = ctx_init
         self.class_token_position = class_token_position
         self.csc = csc
+        self.lambda_kl = lambda_kl
 
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
@@ -63,7 +65,8 @@ class CoCoOpSystem:
             "lr_scheduler_type": self.lr_scheduler_type,
             "warmup_epoch": self.warmup_epoch,
             "warmup_type": self.warmup_type,
-            "warmup_cons_lr": self.warmup_cons_lr
+            "warmup_cons_lr": self.warmup_cons_lr,
+            "lambda_kl": self.lambda_kl,
         }, {})
 
         # Get dataloaders
@@ -134,12 +137,13 @@ class CoCoOpSystem:
         c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
-            base_train_loss, base_train_accuracy = training_step(
+            base_train_loss, base_train_accuracy = training_step_v2(
                 model=self.model,
                 dataset=self.train_base,
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
                 device=self.device,
+                lambda_kl=self.lambda_kl
             )
 
             if e % print_epoch_interval == 0:
