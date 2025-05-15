@@ -82,13 +82,21 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         # === Pseudo-base: cross-entropy ===
         inputs_base = torch.stack([img for img, _ in base_batch]).to(device)
         targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(device)
+
+        print(f"input base shape: {inputs_base.shape} target base: {targets_base.shape}")
+        
+        
         logits_base, loss_ce = model(inputs_base, targets_base)
 
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         model.eval()  # needed to disable dropout etc.
         inputs_novel = torch.stack([img for img, _ in novel_batch]).to(device)
         targets_novel = [lbl for _, lbl in novel_batch]
+        targets_novel_tensor = torch.tensor(targets_novel).to(device)
 
+        categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
+        
+        print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
         with torch.no_grad():
             image_features_clip = model.clip_model.encode_image(inputs_novel)
             image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
@@ -105,8 +113,10 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
             clip_logits = image_features_clip @ text_features_clip.T
 
         model.train()
-        student_logits = model(inputs_novel)  # [B, num_classes]
-
+        student_logits, student_loss = model(inputs_novel, targets_novel_tensor)  # [B, num_classes]
+        student_logits = student_logits[:, ]
+        print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
+        
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
             torch.nn.functional.softmax(clip_logits, dim=-1),

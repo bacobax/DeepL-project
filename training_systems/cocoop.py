@@ -126,7 +126,7 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         print("Before training:")
-        self.compute_evaluation(-1, base=True)
+        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
 
