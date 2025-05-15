@@ -114,7 +114,12 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
 
         model.train()
         student_logits, student_loss = model(inputs_novel, targets_novel_tensor)  # [B, num_classes]
-        student_logits = student_logits[:, ]
+        student_logits_tmp = []
+        for img_logits in student_logits:
+            student_logits_tmp.append([logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in categories_novel_tensor])
+
+        student_logits = torch.tensor(student_logits_tmp).to(device)
+
         print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
         
         kl_loss = torch.nn.functional.kl_div(
