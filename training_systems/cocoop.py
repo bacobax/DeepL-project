@@ -193,7 +193,11 @@ class CoCoOpSystem:
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 
-                pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+                pbar.set_postfix(
+                    train_acc=base_train_accuracy,
+                    val_acc=base_val_accuracy,
+                    total_train_acc=total_loss.item()
+                )
 
                 if novel_val_accuracy > best_novel_accuracy:
                     best_novel_accuracy = novel_val_accuracy
