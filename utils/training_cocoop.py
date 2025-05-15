@@ -115,13 +115,16 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         total_loss.backward()
         optimizer.step()
 
-        cumulative_loss += total_loss.item() * inputs_base.size(0)
+        batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
+        cumulative_loss += total_loss.item() * batch_size_total
+
         _, predicted = logits_base.max(dim=1)
         cumulative_accuracy += predicted.eq(targets_base).sum().item()
-        samples += inputs_base.size(0)
+        samples += batch_size_total
 
         pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy/samples, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
+
     return cumulative_loss / samples, cumulative_accuracy / samples
 
 
