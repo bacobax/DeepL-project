@@ -51,6 +51,7 @@ class CoCoOpSystem:
 
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
+
         self.writer.add_hparams({
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
