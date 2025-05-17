@@ -83,9 +83,6 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         inputs_base = torch.stack([img for img, _ in base_batch]).to(device)
         targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(device)
 
-        #print(f"input base shape: {inputs_base.shape} target base: {targets_base.shape}")
-        
-        
         logits_base, loss_ce = model(inputs_base, targets_base)
 
         # === Pseudo-novel: KL divergence with frozen CLIP ===

@@ -13,7 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
-
+def harmonic_mean(a, b):
+    """returns the harmonic mean of a and b"""
+    return 2 * (a * b) / (a + b)
 
 class CoCoOpSystem:
     def __init__(self,
@@ -190,7 +192,10 @@ class CoCoOpSystem:
 
         print("After training:")
         self.model.load_state_dict(torch.load(best_model_path))  # Load best model
-        self.compute_evaluation(c)
+        base_acc, novel_acc = self.compute_evaluation(c)
+        self.writer.add_scalars('Final metrics', {
+            'Harmonic Mean': harmonic_mean(base_acc, novel_acc),
+        }, global_step=0)
         self.writer.close()
         self.save_model()
 
