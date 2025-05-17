@@ -30,7 +30,7 @@ if __name__ == "__main__":
         ctx_init="",
         class_token_position="end",
         csc=False,
-        lambda_kl=0.15
+        lambda_kl=0.7
     )
     
     train_sys.train()
