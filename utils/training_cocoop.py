@@ -73,6 +73,19 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
                 novel_samples.append((img, label))
         return base_samples, novel_samples
 
+    def custom_collate_full_batch(batch):
+        base_samples = []
+        novel_samples = []
+        targets_in_batch = list(set([target for _, target in batch]))
+        pseudo_base_ids = targets_in_batch
+        pseudo_novel_ids = targets_in_batch
+        for img, label in batch:
+            if label in pseudo_base_ids:
+                base_samples.append((img, label))
+            elif label in pseudo_novel_ids:
+                novel_samples.append((img, label))
+        return base_samples, novel_samples
+
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=custom_collate)
     pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
     for base_batch, novel_batch in dataloader:
