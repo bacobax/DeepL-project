@@ -53,10 +53,12 @@ if __name__ == "__main__":
     N_CLUSTERS = 2
     VARIANCE = 0.95
 
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    DEVICE = "mps" if torch.mps.is_available() else "cpu"
     # initialize clip model with ViT
     clip_model, preprocess = clip.load("ViT-B/32")
-    train_set, _, _ = get_data(transform=preprocess)
+    clip_model=clip_model.to(DEVICE)
+
+    train_set, _, _ = get_data(data_dir="../data", transform=preprocess)
 
     # split classes into base and novel
     base_classes, _ = base_novel_categories(train_set)
