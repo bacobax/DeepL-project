@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.cuda.amp import GradScaler, autocast
 from model.cocoop.prompt_learner import PromptLearner
+from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from easydict import EasyDict
@@ -49,6 +50,7 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
         self.clip_model = clip_model
         self.cfg = cfg
+
 
     @contextmanager
     def temporary_classnames(self, new_classnames):
@@ -126,6 +128,7 @@ class CustomCLIP(nn.Module):
         logits = torch.stack(logits)
         if logits.isnan().any():
             raise ValueError("NaN detected in logits")
+
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
