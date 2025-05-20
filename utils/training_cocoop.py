@@ -7,7 +7,6 @@ import random
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
-
 @torch.no_grad()
 def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None):
     model.eval()
@@ -76,14 +75,11 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
     def custom_collate_full_batch(batch):
         base_samples = []
         novel_samples = []
-        targets_in_batch = list(set([target for _, target in batch]))
-        pseudo_base_ids = targets_in_batch
-        pseudo_novel_ids = targets_in_batch
+
         for img, label in batch:
-            if label in pseudo_base_ids:
-                base_samples.append((img, label))
-            elif label in pseudo_novel_ids:
-                novel_samples.append((img, label))
+            base_samples.append((img, label))
+            novel_samples.append((img, label))
+
         return base_samples, novel_samples
 
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=custom_collate)
