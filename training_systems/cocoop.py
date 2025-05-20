@@ -41,7 +41,7 @@ class CoCoOpSystem:
         ctx_init="",
         class_token_position="end",
         csc=False,
-        lambda_kl=0.5,
+        lambda_kl=None,
         cls_cluster_dict=None,
         lambda_adv=0.5,
         adv_training_epochs=2,
@@ -90,7 +90,8 @@ class CoCoOpSystem:
                 "lr_scheduler_type": self.lr_scheduler_type,
                 "warmup_epoch": self.warmup_epoch,
                 "warmup_type": self.warmup_type,
-                "lambda_kl": self.lambda_kl,
+                "lambda_kl_first": self.lambda_kl[0],
+                "lambda_kl_second": self.lambda_kl[1],
                 "warmup_cons_lr": self.warmup_cons_lr,
                 # "cls_cluster_dict": self.cls_cluster_dict,
                 "lambda_adv": self.lambda_adv,
@@ -206,8 +207,14 @@ class CoCoOpSystem:
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
                 device=self.device,
-                lambda_kl=self.lambda_kl,
+                lambda_kl=self.lambda_kl[0],
             )
+
+            # Always log train_base values every epoch
+            self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
+            self.writer.add_scalar(f"train_base/ce_accuracy", base_train_ce_accuracy, e)
+            self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
+            self.writer.add_scalar(f"train_base/total_loss", base_train_total_loss, e)
 
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
@@ -231,15 +238,6 @@ class CoCoOpSystem:
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(
                     e, novel_val_loss, novel_val_accuracy, "validation_novel"
-                )
-
-                self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
-                self.writer.add_scalar(
-                    f"train_base/ce_accuracy", base_train_ce_accuracy, e
-                )
-                self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
-                self.writer.add_scalar(
-                    f"train_base/total_loss", base_train_total_loss, e
                 )
 
                 pbar.set_postfix(
@@ -271,8 +269,10 @@ class CoCoOpSystem:
             "Final metrics",
             {
                 "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
+                "Base Accuracy": base_acc,
+                "Novel Accuracy": novel_acc,
             },
-            global_step=0,
+            global_step=c,
         )
 
         last_epoch = self.second_train(c)
@@ -282,18 +282,10 @@ class CoCoOpSystem:
             "Final metrics",
             {
                 "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
+                "Base Accuracy": base_acc,
+                "Novel Accuracy": novel_acc,
             },
-            global_step=1,
-        )
-        self.writer.close()
-        self.save_model()
-
-        self.writer.add_scalars(
-            "Final metrics",
-            {
-                "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
-            },
-            global_step=0,
+            global_step=last_epoch + 1,
         )
         self.writer.close()
         self.save_model()
@@ -329,7 +321,7 @@ class CoCoOpSystem:
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
                 cls_cluster_dict=self.cls_cluster_dict,
-                lambda_kl=self.lambda_kl,
+                lambda_kl=self.lambda_kl[1],
                 lambda_adv=self.lambda_adv,
                 mlp_adversary=self.mlp_adversary,
                 grl=self.grl,
@@ -360,15 +352,15 @@ class CoCoOpSystem:
                     e, novel_val_loss, novel_val_accuracy, "validation_novel"
                 )
 
-                self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
+                self.writer.add_scalar(f"train_adv/ce_loss", base_ce_loss, e)
                 self.writer.add_scalar(
-                    f"train_base/ce_accuracy", base_train_ce_accuracy, e
+                    f"train_adv/ce_accuracy", base_train_ce_accuracy, e
                 )
-                self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
+                self.writer.add_scalar(f"train_adv/kl_loss", base_kl_loss, e)
                 self.writer.add_scalar(
-                    f"train_base/total_loss", base_train_total_loss, e
+                    f"train_adv/total_loss", base_train_total_loss, e
                 )
-                self.writer.add_scalar(f"train_base/mlp_loss", base_adv_loss, e)
+                self.writer.add_scalar(f"train_adv/mlp_loss", base_adv_loss, e)
 
                 pbar.set_postfix(
                     train_acc=base_train_ce_accuracy,
@@ -392,7 +384,7 @@ class CoCoOpSystem:
             pbar.update(1)
             c += 1
 
-        print("After training:")
+        # print("After training:")  # Remove this print line as requested
         self.model.load_state_dict(torch.load(best_model_path))  # Load best model
         return c
 
