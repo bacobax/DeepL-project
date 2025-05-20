@@ -2,9 +2,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from utils.datasets import CLASS_NAMES
 import torch
-from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+from datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 import clip
 import os
 import pickle
@@ -63,6 +62,7 @@ if __name__ == "__main__":
     )
 
     CNN = "ViT-B/32"
+    CNN_SAFE = CNN.replace("/", "_")
     # initialize clip model with ViT
     clip_model, preprocess = clip.load(CNN)
     clip_model = clip_model.to(DEVICE)
@@ -84,11 +84,11 @@ if __name__ == "__main__":
     os.makedirs("clustering_split", exist_ok=True)
 
     with open(
-        f"../clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN}.pkl", "wb"
+        f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl", "wb"
     ) as f:
         pickle.dump(cluster_labels, f)
     with open(
-        f"../clustering_split/cluster_labels_text_{N_CLUSTERS}_{VARIANCE}_{CNN}.pkl",
+        f"clustering_split/cluster_labels_text_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl",
         "wb",
     ) as f:
         pickle.dump(cluster_labels_text, f)
