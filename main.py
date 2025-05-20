@@ -64,17 +64,19 @@ if __name__ == "__main__":
             learning_rate=0.002,
             weight_decay=0.0001,
             momentum=0.9,
-            epochs=2,
-            run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            epochs=12,
+            run_name=f"adv_training_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
             class_token_position="end",
             csc=False,
-            lambda_kl=0.7,
+            lambda_kl=0.5,
             cls_cluster_dict=cls_cluster_dict,
             lambda_adv=0.5,
-            adv_training_epochs=2,
+            adv_training_epochs=10,
             cnn_model=CNN,
+            warmup_epoch=1,
+            warmup_cons_lr=1e-5
         )
 
     train_sys.train()

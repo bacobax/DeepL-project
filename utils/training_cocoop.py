@@ -108,13 +108,13 @@ def adversarial_training_step(
         reversed_logits = grl(logits_base)
         cluster_logits = mlp_adversary(reversed_logits).squeeze()
 
-        true_labels = [tmp_dataset.idx2cat[c] for c in targets_base]
-        cluster_labels = [cls_cluster_dict[int(tl.item())] for tl in true_labels]
+        true_labels = [tmp_dataset.idx2cat[c.item()] for c in targets_base]
+        cluster_labels = [cls_cluster_dict[int(tl)] for tl in true_labels]
 
         cluster_labels = torch.tensor(
             cluster_labels,
             device=targets_base.device,
-            dtype=torch.float
+            dtype=torch.float16
         )
         loss_bce = F.binary_cross_entropy(cluster_logits, cluster_labels)
 

@@ -46,6 +46,8 @@ class CoCoOpSystem:
         lambda_adv=0.5,
         adv_training_epochs=2,
         cnn_model="ViT-B/32",
+        warmup_epoch=1,
+        warmup_cons_lr=1e-5
     ):
         self.batch_size = batch_size
         self.device = device
@@ -64,9 +66,9 @@ class CoCoOpSystem:
         self.adv_training_epochs = adv_training_epochs
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
-        self.warmup_epoch = 1
+        self.warmup_epoch = warmup_epoch
         self.warmup_type = "constant"
-        self.warmup_cons_lr = 1e-5
+        self.warmup_cons_lr = warmup_cons_lr
 
         self.cnn_model = cnn_model
 
@@ -150,7 +152,7 @@ class CoCoOpSystem:
         self.cost_function = nn.CrossEntropyLoss()
 
         self.grl = GradientReversalLayer(lambda_=1.0)
-        self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes))
+        self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes)).to(device, dtype=torch.float16)
         self.optimizer = self.get_optimizer(
             self.model,
             self.mlp_adversary,
@@ -158,6 +160,9 @@ class CoCoOpSystem:
             self.weight_decay,
             self.momentum,
         )
+        for name, param in self.mlp_adversary.named_parameters():
+            
+            print(f"mlp dtype: {param.dtype}")
 
     def train(self):
         def lr_lambda(current_epoch):
@@ -177,7 +182,7 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         print("Before training:")
-        #self.compute_evaluation(-1, base=True)
+        self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
 
@@ -300,11 +305,11 @@ class CoCoOpSystem:
 
         best_novel_accuracy = 0.0
         patience_counter = 0
-        patience = 4  # adjustable
+        patience = 3 # adjustable
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         c = start_epoch
         pbar = tqdm(
-            total=self.max_epoch - start_epoch,
+            total=self.max_epoch,
             desc="OVERALL TRAINING - Adversarial",
             position=0,
             leave=True,
