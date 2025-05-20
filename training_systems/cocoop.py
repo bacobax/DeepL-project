@@ -7,13 +7,15 @@ from tqdm import tqdm
 
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import test_step, training_step, eval_step
+from utils.training_cocoop import test_step, training_step, eval_step, training_step_v2
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
-
+def harmonic_mean(a, b):
+    """returns the harmonic mean of a and b"""
+    return 2 * (a * b) / (a + b)
 
 class CoCoOpSystem:
     def __init__(self,
@@ -28,6 +30,7 @@ class CoCoOpSystem:
                  ctx_init="",
                  class_token_position="end",
                  csc=False,
+                 lambda_kl=0.5,
                  ):
         self.batch_size = batch_size
         self.device = device
@@ -40,6 +43,7 @@ class CoCoOpSystem:
         self.ctx_init = ctx_init
         self.class_token_position = class_token_position
         self.csc = csc
+        self.lambda_kl = lambda_kl
 
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
@@ -49,6 +53,7 @@ class CoCoOpSystem:
 
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
+
         self.writer.add_hparams({
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
@@ -63,7 +68,8 @@ class CoCoOpSystem:
             "lr_scheduler_type": self.lr_scheduler_type,
             "warmup_epoch": self.warmup_epoch,
             "warmup_type": self.warmup_type,
-            "warmup_cons_lr": self.warmup_cons_lr
+            "lambda_kl": self.lambda_kl,
+            "warmup_cons_lr": self.warmup_cons_lr,
         }, {})
 
         # Get dataloaders
@@ -129,17 +135,18 @@ class CoCoOpSystem:
 
         best_novel_accuracy = 0.0
         patience_counter = 0
-        patience = 3# adjustable
+        patience = 4# adjustable
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         c = 0
         pbar = tqdm(total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True)
         for e in range(self.max_epoch):
-            base_train_loss, base_train_accuracy = training_step(
+            base_train_total_loss, base_train_ce_accuracy, base_ce_loss, base_kl_loss = training_step_v2(
                 model=self.model,
                 dataset=self.train_base,
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
                 device=self.device,
+                lambda_kl=self.lambda_kl
             )
 
             if e % print_epoch_interval == 0:
@@ -159,11 +166,15 @@ class CoCoOpSystem:
                     new_classnames=self.novel_classes,
                 )
 
-                self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(e, novel_val_loss, novel_val_accuracy, "validation_novel")
 
-                pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
+                self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
+                self.writer.add_scalar(f"train_base/ce_accuracy", base_train_ce_accuracy, e)
+                self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
+                self.writer.add_scalar(f"train_base/total_loss", base_train_total_loss, e)
+
+                pbar.set_postfix(train_acc=base_train_ce_accuracy, val_acc=base_val_accuracy, train_total_loss=base_train_total_loss)
 
                 if novel_val_accuracy > best_novel_accuracy:
                     best_novel_accuracy = novel_val_accuracy
@@ -181,7 +192,10 @@ class CoCoOpSystem:
 
         print("After training:")
         self.model.load_state_dict(torch.load(best_model_path))  # Load best model
-        self.compute_evaluation(c)
+        base_acc, novel_acc = self.compute_evaluation(c)
+        self.writer.add_scalars('Final metrics', {
+            'Harmonic Mean': harmonic_mean(base_acc, novel_acc),
+        }, global_step=0)
         self.writer.close()
         self.save_model()
 

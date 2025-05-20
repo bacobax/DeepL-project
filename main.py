@@ -19,7 +19,7 @@ if __name__ == "__main__":
     train_cls = CoOpSystem if use_coop else CoCoOpSystem
 
     train_sys = train_cls(
-        batch_size=1,
+        batch_size=10,
         device=device,
         learning_rate=0.002,
         weight_decay=0.0001,
@@ -30,6 +30,7 @@ if __name__ == "__main__":
         ctx_init="",
         class_token_position="end",
         csc=False,
+        lambda_kl=0.7
     )
     
     train_sys.train()

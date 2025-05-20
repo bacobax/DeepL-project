@@ -43,7 +43,7 @@ class PromptLearner(nn.Module):
         if hasattr(cfg.TRAINER.COCOOP, "CTX_LOAD") and cfg.TRAINER.COCOOP.CTX_LOAD:
             ctx_path = cfg.TRAINER.COCOOP.CTX_LOAD
             if os.path.isfile(ctx_path):
-                print(f"🔁 Loading ctx from: {ctx_path}")
+                #print(f"🔁 Loading ctx from: {ctx_path}")
                 state_dict = torch.load(ctx_path, map_location="cpu")
                 if "ctx" in state_dict:
                     with torch.no_grad():
@@ -52,7 +52,7 @@ class PromptLearner(nn.Module):
                     raise KeyError(f"'ctx' not found in {ctx_path}")
             else:
                 raise FileNotFoundError(f"CTX_LOAD path not found: {ctx_path}")
-            print("PROMPT LEARNER LOADED FROM A COOP PRETRAINED ONE")
+            #print("PROMPT LEARNER LOADED FROM A COOP PRETRAINED ONE")
 
         self.meta_net = nn.Sequential(OrderedDict([
             ("linear1", nn.Linear(vis_dim, vis_dim // 16)),

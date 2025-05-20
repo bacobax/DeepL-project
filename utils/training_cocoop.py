@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
-
+import random
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
@@ -45,6 +45,127 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
         correct += (predictions == targets).sum().item()
         total += targets.size(0)
     return correct, total, total_loss
+
+def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="cuda"):
+    samples = 0.0
+    kl_samples = 0.0
+    ce_samples = 0.0
+    cumulative_loss = 0.0
+    cumulative_accuracy = 0.0
+    cumulative_ce_loss = 0.0
+    cumulative_kl_loss = 0.0
+
+    model.train()
+    tmp_dataset = ContiguousLabelDataset(dataset)
+
+    def custom_collate(batch):
+        base_samples = []
+        novel_samples = []
+        targets_in_batch = list(set([target for _, target in batch]))
+        random.shuffle(targets_in_batch)
+        split_idx = int(0.7 * len(targets_in_batch))
+        pseudo_base_ids = targets_in_batch[:split_idx]
+        pseudo_novel_ids = targets_in_batch[split_idx:]
+        for img, label in batch:
+            if label in pseudo_base_ids:
+                base_samples.append((img, label))
+            elif label in pseudo_novel_ids:
+                novel_samples.append((img, label))
+        return base_samples, novel_samples
+
+    def custom_collate_full_batch(batch):
+        base_samples = []
+        novel_samples = []
+        targets_in_batch = list(set([target for _, target in batch]))
+        pseudo_base_ids = targets_in_batch
+        pseudo_novel_ids = targets_in_batch
+        for img, label in batch:
+            if label in pseudo_base_ids:
+                base_samples.append((img, label))
+            elif label in pseudo_novel_ids:
+                novel_samples.append((img, label))
+        return base_samples, novel_samples
+
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=custom_collate)
+    pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
+    for base_batch, novel_batch in dataloader:
+        if not base_batch or not novel_batch:
+            continue  # skip incomplete batch
+
+        # === Pseudo-base: cross-entropy ===
+        inputs_base = torch.stack([img for img, _ in base_batch]).to(device)
+        targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(device)
+
+        logits_base, loss_ce = model(inputs_base, targets_base)
+
+        # === Pseudo-novel: KL divergence with frozen CLIP ===
+        model.eval()  # needed to disable dropout etc.
+        inputs_novel = torch.stack([img for img, _ in novel_batch]).to(device)
+        targets_novel = [lbl for _, lbl in novel_batch]
+        targets_novel_tensor = torch.tensor(targets_novel).to(device)
+
+        categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
+        
+        #print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
+        with torch.no_grad():
+            image_features_clip = model.clip_model.encode_image(inputs_novel)
+            image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
+
+            category_idxs = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
+
+            text_inputs = clip.tokenize(
+                [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in category_idxs]
+            ).to(device)
+
+            text_features_clip = model.clip_model.encode_text(text_inputs)
+            text_features_clip = text_features_clip / text_features_clip.norm(dim=-1, keepdim=True)
+
+            clip_logits = image_features_clip @ text_features_clip.T
+
+        model.train()
+        student_logits, student_loss = model(inputs_novel, targets_novel_tensor)  # [B, num_classes]
+        student_logits_tmp = []
+        for img_logits in student_logits:
+            student_logits_tmp.append([logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in categories_novel_tensor])
+
+        student_logits = torch.tensor(student_logits_tmp).to(device)
+
+        #print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
+        
+        kl_loss = torch.nn.functional.kl_div(
+            torch.nn.functional.log_softmax(student_logits, dim=-1),
+            torch.nn.functional.softmax(clip_logits, dim=-1),
+            reduction="batchmean"
+        )
+
+        # === Combine losses ===
+        total_loss = loss_ce + lambda_kl * kl_loss
+
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+
+        batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
+        cumulative_loss += total_loss.item() * batch_size_total
+        cumulative_ce_loss += loss_ce.item() * inputs_base.size(0)
+        cumulative_kl_loss += kl_loss.item() * inputs_novel.size(0)
+
+        samples += batch_size_total
+        ce_samples += inputs_base.size(0)
+        kl_samples += inputs_novel.size(0)
+
+        _, predicted = logits_base.max(dim=1)
+        cumulative_accuracy += predicted.eq(targets_base).sum().item()
+
+        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy/samples, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
+        pbar.update(1)
+
+    return (
+        cumulative_loss / samples,
+        cumulative_accuracy / ce_samples,
+        cumulative_ce_loss / ce_samples,
+        cumulative_kl_loss / kl_samples,
+    )
 
 
 def training_step(model, dataset, optimizer, batch_size, device="cuda"):
