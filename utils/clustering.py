@@ -1,12 +1,13 @@
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from tqdm import tqdm
 from utils.datasets import CLASS_NAMES
 import torch
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 import clip
 import os
-import json
+import pickle
 
 
 def cluster_categories(
@@ -14,7 +15,7 @@ def cluster_categories(
 ):
     class_feature = {}
     with torch.no_grad():
-        for c in base_classes:
+        for c in tqdm(base_classes, desc="Processing classes"):
             imgs_c = [img for img, label in train_base if label == c]
             features = [
                 clip_model.encode_image(img.unsqueeze(0).to(device)).cpu().numpy()
@@ -53,10 +54,18 @@ if __name__ == "__main__":
     N_CLUSTERS = 2
     VARIANCE = 0.95
 
-    DEVICE = "mps" if torch.mps.is_available() else "cpu"
+    # set device to either cuda, mps or cpu
+
+    DEVICE = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
+
+    CNN = "ViT-B/32"
     # initialize clip model with ViT
-    clip_model, preprocess = clip.load("ViT-B/32")
-    clip_model=clip_model.to(DEVICE)
+    clip_model, preprocess = clip.load(CNN)
+    clip_model = clip_model.to(DEVICE)
 
     train_set, _, _ = get_data(data_dir="../data", transform=preprocess)
 
@@ -71,15 +80,14 @@ if __name__ == "__main__":
         clip_model, base_classes, train_base, DEVICE
     )
 
-    # save to file in dir clustering_split with params in the file name as a json
+    # save to file in dir clustering_split with params in the file name as numpy array with pickle
     os.makedirs("clustering_split", exist_ok=True)
 
     with open(
-        f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}.json", "w"
+        f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN}.pkl", "wb"
     ) as f:
-        json.dump(cluster_labels, f)
+        pickle.dump(cluster_labels, f)
     with open(
-        f"clustering_split/cluster_labels_text_{N_CLUSTERS}_{VARIANCE}.json", "w"
+        f"clustering_split/cluster_labels_text_{N_CLUSTERS}_{VARIANCE}_{CNN}.pkl", "wb"
     ) as f:
-        json.dump(cluster_labels_text, f)
-    print("Cluster labels saved to clustering_split directory.")
+        pickle.dump(cluster_labels_text, f)
