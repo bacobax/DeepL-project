@@ -6,8 +6,9 @@ from easydict import EasyDict
 from tqdm import tqdm
 
 from model.cocoop.custom_clip import CustomCLIP
+from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import test_step, training_step, eval_step, training_step_v2
+from utils.training_cocoop import test_step, training_step, eval_step, training_step_v2, adversarial_training_step
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
@@ -36,7 +37,8 @@ class CoCoOpSystem:
         csc=False,
         lambda_kl=0.5,
         cls_cluster_dict=None,
-        lambda_bce_mlp=0.5,
+        lambda_adv=0.5,
+        adv_training_epochs=2,
     ):
         self.batch_size = batch_size
         self.device = device
@@ -51,8 +53,8 @@ class CoCoOpSystem:
         self.csc = csc
         self.lambda_kl = lambda_kl
         self.cls_cluster_dict = cls_cluster_dict
-        self.lambda_bce_mlp = lambda_bce_mlp
-
+        self.lambda_adv = lambda_adv
+        self.adv_training_epochs = adv_training_epochs
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
         self.warmup_epoch = 1
@@ -118,8 +120,6 @@ class CoCoOpSystem:
             resolution,
         ]  # Must match CLIP model's input resolution
 
-        cfg.cls_cluster_dict = cls_cluster_dict
-
         # Instantiate the network and move it to the chosen device (GPU)
         self.model = CustomCLIP(
             classnames=[CLASS_NAMES[idx] for idx in self.base_classes],
@@ -137,10 +137,13 @@ class CoCoOpSystem:
             f"Total trainable parameters: {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,}"
         )
 
-        self.optimizer = self.get_optimizer(
-            self.learning_rate, self.weight_decay, self.momentum
-        )
         self.cost_function = nn.CrossEntropyLoss()
+
+        self.grl = GradientReversalLayer(lambda_=1.0)
+        self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes))
+        self.optimizer = self.get_optimizer(
+            self.model, self.mlp_adversary, self.learning_rate, self.weight_decay, self.momentum
+        )
 
     def train(self):
         def lr_lambda(current_epoch):
@@ -250,8 +253,124 @@ class CoCoOpSystem:
             },
             global_step=0,
         )
+
+        last_epoch = self.second_train(c)
+
+        base_acc, novel_acc = self.compute_evaluation(last_epoch)
+        self.writer.add_scalars(
+            "Final metrics",
+            {
+                "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
+            },
+            global_step=1,
+        )
         self.writer.close()
         self.save_model()
+
+        self.writer.add_scalars(
+            "Final metrics",
+            {
+                "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
+            },
+            global_step=0,
+        )
+        self.writer.close()
+        self.save_model()
+
+    def second_train(self, start_epoch):
+
+
+        print("Training the adv  model...")
+        print_epoch_interval = 2
+
+        best_novel_accuracy = 0.0
+        patience_counter = 0
+        patience = 4  # adjustable
+        best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+        c = start_epoch
+        pbar = tqdm(
+            total=self.max_epoch-start_epoch, desc="OVERALL TRAINING", position=0, leave=True, initial=start_epoch
+        )
+        end_adv_training_epoch = start_epoch + self.adv_training_epochs
+        for e in range(start_epoch, end_adv_training_epoch):
+            (
+                base_train_total_loss,
+                base_train_ce_accuracy,
+                base_ce_loss,
+                base_kl_loss,
+                base_adv_loss,
+            ) = adversarial_training_step(
+                model=self.model,
+                dataset=self.train_base,
+                optimizer=self.optimizer,
+                batch_size=self.batch_size,
+                cls_cluster_dict=self.cls_cluster_dict,
+                lambda_kl=self.lambda_kl,
+                lambda_adv=self.lambda_adv,
+                mlp_adversary=self.mlp_adversary,
+                grl=self.grl,
+                device=self.device,
+            )
+
+            if e % print_epoch_interval == 0:
+                base_val_loss, base_val_accuracy = eval_step(
+                    model=self.model,
+                    dataset=self.val_base,
+                    cost_function=self.cost_function,
+                    device=self.device,
+                    batch_size=self.batch_size,
+                )
+                novel_val_loss, novel_val_accuracy = eval_step(
+                    model=self.model,
+                    dataset=self.val_novel,
+                    cost_function=self.cost_function,
+                    device=self.device,
+                    batch_size=self.batch_size,
+                    new_classnames=self.novel_classes,
+                )
+
+                self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
+                self.log_values(
+                    e, novel_val_loss, novel_val_accuracy, "validation_novel"
+                )
+
+                self.writer.add_scalar(f"train_base/ce_loss", base_ce_loss, e)
+                self.writer.add_scalar(
+                    f"train_base/ce_accuracy", base_train_ce_accuracy, e
+                )
+                self.writer.add_scalar(f"train_base/kl_loss", base_kl_loss, e)
+                self.writer.add_scalar(
+                    f"train_base/total_loss", base_train_total_loss, e
+                )
+                self.writer.add_scalar(
+                    f"train_base/mlp_loss", base_adv_loss, e
+                )
+
+                pbar.set_postfix(
+                    train_acc=base_train_ce_accuracy,
+                    val_acc=base_val_accuracy,
+                    train_total_loss=base_train_total_loss,
+                    train_adv_loss=base_adv_loss,
+                )
+
+                if novel_val_accuracy > best_novel_accuracy:
+                    best_novel_accuracy = novel_val_accuracy
+                    patience_counter = 0
+                    torch.save(self.model.state_dict(), best_model_path)
+                else:
+                    patience_counter += 1
+                    if patience_counter >= patience:
+                        print(
+                            f"Stopping early at epoch {e} due to no improvement in novel accuracy."
+                        )
+                        break
+
+            pbar.update(1)
+            c += 1
+
+        print("After training:")
+        self.model.load_state_dict(torch.load(best_model_path))  # Load best model
+        return c
 
     def save_model(self, path="./bin/cocoop"):
         # create folder if not exist
@@ -294,15 +413,13 @@ class CoCoOpSystem:
 
         return base_accuracy, novel_accuracy
 
-    def get_optimizer(self, lr, wd, momentum):
-        optimizer = SGD(
-            [{"params": self.model.parameters()}],
+    def get_optimizer(self, model, mlp_adversary, lr, wd, momentum):
+        return SGD(
+            [{"params": list(model.parameters()) + list(mlp_adversary.parameters())}],
             lr=lr,
             weight_decay=wd,
             momentum=momentum,
         )
-
-        return optimizer
 
     def log_value(self, step, accuracy, prefix):
         self.writer.add_scalar(f"{prefix}/accuracy", accuracy, step)
