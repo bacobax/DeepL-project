@@ -309,7 +309,14 @@ class CoCoOpSystem:
             initial=start_epoch,
         )
         end_adv_training_epoch = start_epoch + self.adv_training_epochs
+        # --- Lambda adv warmup ---
+        lambda_adv_max = self.lambda_adv
+        warmup_epochs = max(1, int(0.2 * self.adv_training_epochs))
+        initial_lambda_adv = 0.05
         for e in range(start_epoch, end_adv_training_epoch):
+            # Compute current lambda_adv with linear warmup
+            progress = (e - start_epoch + 1) / warmup_epochs
+            current_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
             (
                 base_train_total_loss,
                 base_train_ce_accuracy,
@@ -323,7 +330,7 @@ class CoCoOpSystem:
                 batch_size=self.batch_size,
                 cls_cluster_dict=self.cls_cluster_dict,
                 lambda_kl=self.lambda_kl[1],
-                lambda_adv=self.lambda_adv,
+                lambda_adv=current_lambda_adv,
                 mlp_adversary=self.mlp_adversary,
                 grl=self.grl,
                 device=self.device,
@@ -347,7 +354,7 @@ class CoCoOpSystem:
                     new_classnames=self.novel_classes,
                     desc_add=" - Novel"
                 )
-
+                self.writer.add_scalar("lambda_adv", current_lambda_adv, e)
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
                 self.log_values(
                     e, novel_val_loss, novel_val_accuracy, "validation_novel"
@@ -385,7 +392,6 @@ class CoCoOpSystem:
 
             pbar.update(1)
             c += 1
-
 
         # print("After training:")  # Remove this print line as requested
         if at_least_one_improoving:
