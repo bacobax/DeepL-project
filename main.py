@@ -3,6 +3,8 @@ from training_systems.coop import CoOpSystem
 import torch
 import os
 from datetime import datetime
+import pickle
+
 
 if __name__ == "__main__":
     # take the device name from DEVICE env variable
@@ -17,6 +19,22 @@ if __name__ == "__main__":
 
     print(f"Using {'CoOp' if use_coop else 'CoCoOp'} for training")
 
+    # load the cluster labels from the file
+    CNN = "ViT-B/32"
+
+    CNN_SAFE = CNN.replace("/", "_")
+    N_CLUSTERS = 2
+    VARIANCE = 0.95
+
+    file_path = (
+        f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl"
+    )
+
+    cls_cluster_dict = None
+
+    with open(file_path, "rb") as f:
+        cls_cluster_dict = pickle.load(f)
+
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
     #     "class1": 0,
@@ -24,7 +42,6 @@ if __name__ == "__main__":
     #     "class3": 2,
     #     # Add more classes and their corresponding cluster IDs
     # }
-    cls_cluster_dict = None
 
     if use_coop:
         train_sys = CoOpSystem(
@@ -56,6 +73,7 @@ if __name__ == "__main__":
             lambda_kl=0.7,
             cls_cluster_dict=cls_cluster_dict,
             lambda_bce_mlp=0.5,
+            cnn_model=CNN,
         )
 
     train_sys.train()

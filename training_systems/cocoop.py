@@ -8,7 +8,13 @@ from tqdm import tqdm
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import test_step, training_step, eval_step, training_step_v2, adversarial_training_step
+from utils.training_cocoop import (
+    test_step,
+    training_step,
+    eval_step,
+    training_step_v2,
+    adversarial_training_step,
+)
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
@@ -39,6 +45,7 @@ class CoCoOpSystem:
         cls_cluster_dict=None,
         lambda_adv=0.5,
         adv_training_epochs=2,
+        cnn_model="ViT-B/32",
     ):
         self.batch_size = batch_size
         self.device = device
@@ -60,6 +67,8 @@ class CoCoOpSystem:
         self.warmup_epoch = 1
         self.warmup_type = "constant"
         self.warmup_cons_lr = 1e-5
+
+        self.cnn_model = cnn_model
 
         # Create a logger for the experiment
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{run_name}")
@@ -83,13 +92,14 @@ class CoCoOpSystem:
                 "warmup_cons_lr": self.warmup_cons_lr,
                 "cls_cluster_dict": self.cls_cluster_dict,
                 "lambda_bce_mlp": self.lambda_bce_mlp,
+                "cnn_model": self.cnn_model,
             },
             {},
         )
 
         # Get dataloaders
 
-        self.clip_model, preprocess = clip.load("ViT-B/32")
+        self.clip_model, preprocess = clip.load(cnn_model)
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
 
         # split classes into base and novel
@@ -142,7 +152,11 @@ class CoCoOpSystem:
         self.grl = GradientReversalLayer(lambda_=1.0)
         self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes))
         self.optimizer = self.get_optimizer(
-            self.model, self.mlp_adversary, self.learning_rate, self.weight_decay, self.momentum
+            self.model,
+            self.mlp_adversary,
+            self.learning_rate,
+            self.weight_decay,
+            self.momentum,
         )
 
     def train(self):
@@ -279,7 +293,6 @@ class CoCoOpSystem:
 
     def second_train(self, start_epoch):
 
-
         print("Training the adv  model...")
         print_epoch_interval = 2
 
@@ -289,7 +302,11 @@ class CoCoOpSystem:
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         c = start_epoch
         pbar = tqdm(
-            total=self.max_epoch-start_epoch, desc="OVERALL TRAINING", position=0, leave=True, initial=start_epoch
+            total=self.max_epoch - start_epoch,
+            desc="OVERALL TRAINING",
+            position=0,
+            leave=True,
+            initial=start_epoch,
         )
         end_adv_training_epoch = start_epoch + self.adv_training_epochs
         for e in range(start_epoch, end_adv_training_epoch):
@@ -342,9 +359,7 @@ class CoCoOpSystem:
                 self.writer.add_scalar(
                     f"train_base/total_loss", base_train_total_loss, e
                 )
-                self.writer.add_scalar(
-                    f"train_base/mlp_loss", base_adv_loss, e
-                )
+                self.writer.add_scalar(f"train_base/mlp_loss", base_adv_loss, e)
 
                 pbar.set_postfix(
                     train_acc=base_train_ce_accuracy,
