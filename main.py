@@ -70,7 +70,7 @@ if __name__ == "__main__":
             ctx_init="",
             class_token_position="end",
             csc=False,
-            lambda_kl=0.5,
+            lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
             lambda_adv=0.5,
             adv_training_epochs=10,
