@@ -123,6 +123,12 @@ def adversarial_training_step(
 
         optimizer.zero_grad()
         total_loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(
+            list(model.parameters()) + list(mlp_adversary.parameters()),
+            max_norm=1.0
+        )
+
         optimizer.step()
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)

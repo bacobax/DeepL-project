@@ -64,7 +64,7 @@ if __name__ == "__main__":
             learning_rate=0.002,
             weight_decay=0.0001,
             momentum=0.9,
-            epochs=12,
+            epochs=10,
             run_name=f"adv_training_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             lambda_adv=0.5,
             adv_training_epochs=10,
             cnn_model=CNN,
-            warmup_epoch=1,
+            warmup_epoch=0,
             warmup_cons_lr=1e-5
         )
 

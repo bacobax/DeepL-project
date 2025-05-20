@@ -24,6 +24,7 @@ class TextEncoder(nn.Module):
         self.ln_final = clip_model.ln_final
         self.text_projection = clip_model.text_projection
         self.dtype = clip_model.dtype
+        print(f"self.dtype={self.dtype}")
 
     def forward(self, prompts, tokenized_prompts):
         x = prompts + self.positional_embedding.type(self.dtype)
