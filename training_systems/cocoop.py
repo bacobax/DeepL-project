@@ -297,8 +297,9 @@ class CoCoOpSystem:
 
         best_novel_accuracy = 0.0
         patience_counter = 0
-        patience = 3 # adjustable
+        patience = 5 # adjustable
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+        at_least_one_improoving = False
         c = start_epoch
         pbar = tqdm(
             total=self.max_epoch,
@@ -373,6 +374,7 @@ class CoCoOpSystem:
                     best_novel_accuracy = novel_val_accuracy
                     patience_counter = 0
                     torch.save(self.model.state_dict(), best_model_path)
+                    at_least_one_improoving = True
                 else:
                     patience_counter += 1
                     if patience_counter >= patience:
@@ -384,8 +386,10 @@ class CoCoOpSystem:
             pbar.update(1)
             c += 1
 
+
         # print("After training:")  # Remove this print line as requested
-        self.model.load_state_dict(torch.load(best_model_path))  # Load best model
+        if at_least_one_improoving:
+            self.model.load_state_dict(torch.load(best_model_path))
         return c
 
     def save_model(self, path="./bin/cocoop"):
