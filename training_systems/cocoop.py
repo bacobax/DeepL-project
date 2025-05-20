@@ -36,6 +36,7 @@ class CoCoOpSystem:
         csc=False,
         lambda_kl=0.5,
         cls_cluster_dict=None,
+        lambda_bce_mlp=0.5,
     ):
         self.batch_size = batch_size
         self.device = device
@@ -49,6 +50,8 @@ class CoCoOpSystem:
         self.class_token_position = class_token_position
         self.csc = csc
         self.lambda_kl = lambda_kl
+        self.cls_cluster_dict = cls_cluster_dict
+        self.lambda_bce_mlp = lambda_bce_mlp
 
         self.max_epoch = self.epochs
         self.lr_scheduler_type = "cosine"
@@ -76,7 +79,8 @@ class CoCoOpSystem:
                 "warmup_type": self.warmup_type,
                 "lambda_kl": self.lambda_kl,
                 "warmup_cons_lr": self.warmup_cons_lr,
-                "cls_cluster_dict": cls_cluster_dict,
+                "cls_cluster_dict": self.cls_cluster_dict,
+                "lambda_bce_mlp": self.lambda_bce_mlp,
             },
             {},
         )

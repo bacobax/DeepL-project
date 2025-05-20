@@ -55,6 +55,7 @@ if __name__ == "__main__":
             csc=False,
             lambda_kl=0.7,
             cls_cluster_dict=cls_cluster_dict,
+            lambda_bce_mlp=0.5,
         )
 
     train_sys.train()
