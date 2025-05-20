@@ -10,7 +10,7 @@ from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 @torch.no_grad()
-def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None):
+def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None, desc_add=""):
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -23,18 +23,18 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_c
         new_classnames = [CLASS_NAMES[c] for c in new_classnames]
         with model.temporary_classnames(new_classnames):
             correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
-                                                          total_loss)
+                                                          total_loss, desc_add)
 
     else:
         correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
-                                                      total_loss)
+                                                      total_loss, desc_add)
     avg_loss = total_loss / total
     accuracy = correct / total
     return avg_loss, accuracy
 
 
-def walk_the_dataset(correct, cost_function, dataloader, device, model, total, total_loss):
-    for images, targets in tqdm(dataloader, desc="Validation", position=1, leave=False):
+def walk_the_dataset(correct, cost_function, dataloader, device, model, total, total_loss, desc_add=""):
+    for images, targets in tqdm(dataloader, desc="Validation"+desc_add, position=1, leave=False):
         images = images.to(device)
         targets = targets.to(device)
 
@@ -220,7 +220,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         inputs_base = torch.stack([img for img, _ in base_batch]).to(device)
         targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(device)
 
-        logits_base, loss_ce, loss_bce = model(inputs_base, targets_base)
+        logits_base, loss_ce = model(inputs_base, targets_base)
 
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         model.eval()  # needed to disable dropout etc.

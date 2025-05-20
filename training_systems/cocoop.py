@@ -90,8 +90,8 @@ class CoCoOpSystem:
                 "warmup_type": self.warmup_type,
                 "lambda_kl": self.lambda_kl,
                 "warmup_cons_lr": self.warmup_cons_lr,
-                "cls_cluster_dict": self.cls_cluster_dict,
-                "lambda_bce_mlp": self.lambda_bce_mlp,
+                # "cls_cluster_dict": self.cls_cluster_dict,
+                "lambda_adv": self.lambda_adv,
                 "cnn_model": self.cnn_model,
             },
             {},
@@ -177,7 +177,7 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         print("Before training:")
-        self.compute_evaluation(-1, base=True)
+        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
 
@@ -211,6 +211,7 @@ class CoCoOpSystem:
                     cost_function=self.cost_function,
                     device=self.device,
                     batch_size=self.batch_size,
+                    desc_add=" - Base"
                 )
                 novel_val_loss, novel_val_accuracy = eval_step(
                     model=self.model,
@@ -219,6 +220,7 @@ class CoCoOpSystem:
                     device=self.device,
                     batch_size=self.batch_size,
                     new_classnames=self.novel_classes,
+                    desc_add=" - Novel"
                 )
 
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
@@ -303,7 +305,7 @@ class CoCoOpSystem:
         c = start_epoch
         pbar = tqdm(
             total=self.max_epoch - start_epoch,
-            desc="OVERALL TRAINING",
+            desc="OVERALL TRAINING - Adversarial",
             position=0,
             leave=True,
             initial=start_epoch,
@@ -336,6 +338,7 @@ class CoCoOpSystem:
                     cost_function=self.cost_function,
                     device=self.device,
                     batch_size=self.batch_size,
+                    desc_add=" - Base"
                 )
                 novel_val_loss, novel_val_accuracy = eval_step(
                     model=self.model,
@@ -344,6 +347,7 @@ class CoCoOpSystem:
                     device=self.device,
                     batch_size=self.batch_size,
                     new_classnames=self.novel_classes,
+                    desc_add=" - Novel"
                 )
 
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")

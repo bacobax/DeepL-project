@@ -4,3 +4,4 @@ cifar10
 .idea
 .qodo
 __pycache__
+.ipynb_checkpoints

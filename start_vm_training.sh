@@ -9,7 +9,7 @@ ENV_YAML=environment.yml
 PYTHON_SCRIPT=main.py  # <-- Replace with your actual entry point
 LOG_DIR=logs
 export DEVICE="cuda"  # or "cpu" if no GPU available
-export USING_COOP="true"
+export USING_COOP="false"
 # === Activate Conda ===
 echo "Activating Conda..."
 eval "$(conda shell.bash hook)"
