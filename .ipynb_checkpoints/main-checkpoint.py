@@ -74,7 +74,7 @@ if __name__ == "__main__":
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
             lambda_adv=0.5,
-            adv_training_epochs=13,
+            adv_training_epochs=2,
             cnn_model=CNN,
             warmup_epoch=0,
             warmup_cons_lr=1e-5,
