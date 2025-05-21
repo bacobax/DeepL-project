@@ -73,6 +73,7 @@ class CoCoOpSystem:
             "warmup_cons_lr": self.warmup_cons_lr,
             "lambda_adv": self.lambda_adv,
             "cnn_model": self.cnn_model,
+            "grl_lambda" : self.grl_lambda,
         })
 
         # Load model

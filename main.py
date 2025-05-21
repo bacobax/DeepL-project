@@ -66,7 +66,7 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=10,
+            epochs=5,
             run_name=f"adv_training_run_2optim_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             csc=False,
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
-            lambda_adv=0.5,
+            lambda_adv=0.6,
             adv_training_epochs=10,
             cnn_model=CNN,
             warmup_epoch=0,
