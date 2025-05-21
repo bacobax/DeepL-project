@@ -77,3 +77,13 @@ class MetricMeter:
         for name, meter in self.meters.items():
             output_str.append(f"{name} {meter.val:.4f} ({meter.avg:.4f})")
         return self.delimiter.join(output_str)
+
+
+if __name__ == "__main__":
+    # Example usage
+    metric = MetricMeter()
+    metric.update({"loss_1": torch.tensor(0.5), "loss_2": torch.tensor(0.8)})
+    metric.update({"loss_1": torch.tensor(0.4)})
+    print(str(metric))
+    metric.update({"loss_1": torch.tensor(0.6), "loss_2": torch.tensor(0.7)})
+    print(str(metric))

@@ -14,6 +14,7 @@ from utils.training_cocoop import (
     eval_step,
     training_step_v2,
     adversarial_training_step,
+    adversarial_kl_training_step
 )
 import clip
 from torch.utils.tensorboard import SummaryWriter
@@ -47,7 +48,8 @@ class CoCoOpSystem:
         adv_training_epochs=2,
         cnn_model="ViT-B/32",
         warmup_epoch=1,
-        warmup_cons_lr=1e-5
+        warmup_cons_lr=1e-5,
+        using_kl_adv=False,
     ):
         self.batch_size = batch_size
         self.device = device
@@ -69,6 +71,7 @@ class CoCoOpSystem:
         self.warmup_epoch = warmup_epoch
         self.warmup_type = "constant"
         self.warmup_cons_lr = warmup_cons_lr
+        self.using_kl_adv = using_kl_adv
 
         self.cnn_model = cnn_model
 
@@ -183,7 +186,7 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         print("Before training:")
-        self.compute_evaluation(-1, base=True)
+        #self.compute_evaluation(-1, base=True)
         print("Training the model...")
         print_epoch_interval = 2
 
@@ -196,6 +199,7 @@ class CoCoOpSystem:
             total=self.max_epoch, desc="OVERALL TRAINING", position=0, leave=True
         )
         for e in range(self.max_epoch):
+            self.writer.add_scalar("learning_rate", self.optimizer.param_groups[0]["lr"], e)
             (
                 base_train_total_loss,
                 base_train_ce_accuracy,
@@ -317,24 +321,42 @@ class CoCoOpSystem:
             # Compute current lambda_adv with linear warmup
             progress = (e - start_epoch + 1) / warmup_epochs
             current_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
-            (
-                base_train_total_loss,
-                base_train_ce_accuracy,
-                base_ce_loss,
-                base_kl_loss,
-                base_adv_loss,
-            ) = adversarial_training_step(
-                model=self.model,
-                dataset=self.train_base,
-                optimizer=self.optimizer,
-                batch_size=self.batch_size,
-                cls_cluster_dict=self.cls_cluster_dict,
-                lambda_kl=self.lambda_kl[1],
-                lambda_adv=current_lambda_adv,
-                mlp_adversary=self.mlp_adversary,
-                grl=self.grl,
-                device=self.device,
-            )
+            if not self.using_kl_adv:
+                (
+                    base_train_total_loss,
+                    base_train_ce_accuracy,
+                    base_ce_loss,
+                    base_adv_loss,
+                ) = adversarial_training_step(
+                    model=self.model,
+                    dataset=self.train_base,
+                    optimizer=self.optimizer,
+                    batch_size=self.batch_size,
+                    cls_cluster_dict=self.cls_cluster_dict,
+                    lambda_adv=current_lambda_adv,
+                    mlp_adversary=self.mlp_adversary,
+                    grl=self.grl,
+                    device=self.device,
+                )
+            else:
+                (
+                    base_train_total_loss,
+                    base_train_ce_accuracy,
+                    base_ce_loss,
+                    base_kl_loss,
+                    base_adv_loss,
+                ) = adversarial_kl_training_step(
+                    model=self.model,
+                    dataset=self.train_base,
+                    optimizer=self.optimizer,
+                    batch_size=self.batch_size,
+                    cls_cluster_dict=self.cls_cluster_dict,
+                    lambda_adv=current_lambda_adv,
+                    mlp_adversary=self.mlp_adversary,
+                    grl=self.grl,
+                    device=self.device,
+                    lambda_kl=self.lambda_kl[1],
+                )
 
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
@@ -364,7 +386,8 @@ class CoCoOpSystem:
                 self.writer.add_scalar(
                     f"train_adv/ce_accuracy", base_train_ce_accuracy, e
                 )
-                self.writer.add_scalar(f"train_adv/kl_loss", base_kl_loss, e)
+                if self.using_kl_adv:
+                    self.writer.add_scalar(f"train_adv/kl_loss", base_kl_loss, e)
                 self.writer.add_scalar(
                     f"train_adv/total_loss", base_train_total_loss, e
                 )
@@ -393,9 +416,10 @@ class CoCoOpSystem:
             pbar.update(1)
             c += 1
 
-        # print("After training:")  # Remove this print line as requested
         if at_least_one_improoving:
             self.model.load_state_dict(torch.load(best_model_path))
+        else:
+            print("No improvement during second training. Using model from first phase.")
         return c
 
     def save_model(self, path="./bin/cocoop"):

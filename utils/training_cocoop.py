@@ -6,7 +6,6 @@ from tqdm import tqdm
 import clip
 import random
 from model.cocoop.custom_clip import CustomCLIP
-from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 from utils.metrics import AverageMeter
 
@@ -17,38 +16,114 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_c
     tmp_dataset = ContiguousLabelDataset(dataset)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
-    total_loss = 0.0
-    correct = 0
-    total = 0
+    loss_meter = AverageMeter()
+    accuracy_meter = AverageMeter()
     if new_classnames is not None:
         new_classnames = [CLASS_NAMES[c] for c in new_classnames]
         with model.temporary_classnames(new_classnames):
-            correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
-                                                          total_loss, desc_add)
+            walk_the_dataset(loss_meter, accuracy_meter, dataloader, device, model, desc_add)
 
     else:
-        correct, total, total_loss = walk_the_dataset(correct, cost_function, dataloader, device, model, total,
-                                                      total_loss, desc_add)
-    avg_loss = total_loss / total
-    accuracy = correct / total
-    return avg_loss, accuracy
+        walk_the_dataset(loss_meter, accuracy_meter, dataloader, device, model, desc_add)
+
+    return loss_meter.avg, accuracy_meter.avg
 
 
-def walk_the_dataset(correct, cost_function, dataloader, device, model, total, total_loss, desc_add=""):
+def walk_the_dataset(loss_meter, accuracy_meter, dataloader, device, model, desc_add=""):
     for images, targets in tqdm(dataloader, desc="Validation"+desc_add, position=1, leave=False):
         images = images.to(device)
         targets = targets.to(device)
 
         logits = model(images)
-        loss = cost_function(logits, targets)
+        loss = F.cross_entropy(logits, targets)
 
-        total_loss += loss.item() * targets.size(0)
         predictions = logits.argmax(dim=-1)
-        correct += (predictions == targets).sum().item()
-        total += targets.size(0)
-    return correct, total, total_loss
+        correct = (predictions == targets).sum().item()
+        batch_size = targets.size(0)
+
+        loss_meter.update(loss.item(), n=batch_size)
+        accuracy_meter.update(correct / batch_size)
+
 
 def adversarial_training_step(
+        model,
+        dataset,
+        optimizer,
+        batch_size,
+        cls_cluster_dict,
+        lambda_adv,
+        mlp_adversary,
+        grl,
+        device="cuda"
+):
+    total_loss_metric = AverageMeter()
+    ce_loss_metric = AverageMeter()
+    adv_loss_metric = AverageMeter()
+    accuracy_metric = AverageMeter()
+
+    model.train()
+    tmp_dataset = ContiguousLabelDataset(dataset)
+
+    dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
+    for batch_idx, (inputs, targets) in enumerate(dataloader):
+        # Load data into GPU
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        targets_real_category = [tmp_dataset.idx2cat[c.item()] for c in targets]
+        cluster_target = [cls_cluster_dict[int(tl)] for tl in targets_real_category]
+        cluster_target = torch.tensor(
+            cluster_target,
+            device=targets.device,
+            dtype=torch.float16
+        )
+        # === MLP forward pass ===
+
+        # Forward pass + loss computation
+        logits, ce_loss = model(inputs, targets)
+
+        # === Adversarial loss ===
+        reversed_logits = grl(logits)
+        cluster_logits = mlp_adversary(reversed_logits).squeeze()
+        loss_bce = F.binary_cross_entropy(cluster_logits, cluster_target)
+
+        # === Combine losses ===
+        total_loss = ce_loss + lambda_adv * loss_bce
+
+        # Backward pass
+        total_loss.backward()
+
+        # Parameters update
+        optimizer.step()
+
+        # Gradients reset
+        optimizer.zero_grad()
+
+        # Fetch prediction and loss value
+        batch_size = inputs.shape[0]
+        total_loss_metric.update(total_loss.item(), n=batch_size)
+        ce_loss_metric.update(ce_loss.item(), n=batch_size)
+        adv_loss_metric.update(loss_bce.item(), n=batch_size)
+
+        _, predicted = logits.max(dim=1)  # max() returns (maximum_value, index_of_maximum_value)
+
+        # Compute training accuracy
+        correct = predicted.eq(targets).sum().item()
+        accuracy_metric.update(correct / batch_size)
+
+        pbar.set_postfix(
+            total_train_loss=total_loss_metric.avg,
+            ce_loss=ce_loss_metric.avg,
+            adv_loss=adv_loss_metric.avg,
+            train_acc=accuracy_metric.avg
+        )
+        pbar.update(1)
+
+    return total_loss_metric.avg, accuracy_metric.avg, ce_loss_metric.avg, adv_loss_metric.avg,
+
+
+def adversarial_kl_training_step(
         model,
         dataset,
         optimizer,
@@ -61,12 +136,11 @@ def adversarial_training_step(
         device="cuda"
 ):
 
-    cumulative_loss = AverageMeter()
-    cumulative_ce_loss = AverageMeter()
-    cumulative_kl_loss = AverageMeter()
-    comulative_adv_loss = AverageMeter()
-    cumulative_accuracy = AverageMeter()
-
+    total_loss_meter = AverageMeter()
+    ce_loss_meter = AverageMeter()
+    kl_loss_meter = AverageMeter()
+    adv_loss_meter = AverageMeter()
+    accuracy_meter = AverageMeter()
 
     model.train()
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -132,24 +206,25 @@ def adversarial_training_step(
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
 
-        cumulative_loss.update(total_loss.item(), n=batch_size_total)
-        cumulative_ce_loss.update(loss_ce.item(), n=inputs_base.size(0))
-        cumulative_kl_loss.update(kl_loss.item(), n=inputs_novel.size(0))
-        comulative_adv_loss.update(loss_bce.item(), n=inputs_base.size(0))
+        total_loss_meter.update(total_loss.item(), n=batch_size_total)
+        ce_loss_meter.update(loss_ce.item(), n=inputs_base.size(0))
+        kl_loss_meter.update(kl_loss.item(), n=inputs_novel.size(0))
+        adv_loss_meter.update(loss_bce.item(), n=inputs_base.size(0))
 
         _, predicted = logits_base.max(dim=1)
+        correct = (predicted == targets_base).sum().item()
+        total = targets_base.size(0)
+        accuracy_meter.update(correct/total)
 
-        cumulative_accuracy.update(predicted.eq(targets_base).sum().item())
-
-        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
+        pbar.set_postfix(total_loss=total_loss.item(), train_acc=accuracy_meter.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
 
     return (
-        cumulative_loss.avg,
-        cumulative_accuracy.avg,
-        cumulative_ce_loss.avg,
-        cumulative_kl_loss.avg,
-        comulative_adv_loss.avg,
+        total_loss_meter.avg,
+        accuracy_meter.avg,
+        ce_loss_meter.avg,
+        kl_loss_meter.avg,
+        adv_loss_meter.avg,
     )
 
 
@@ -188,13 +263,11 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
 
 
 def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="cuda"):
-    samples = 0.0
-    kl_samples = 0.0
-    ce_samples = 0.0
-    cumulative_loss = 0.0
-    cumulative_accuracy = 0.0
-    cumulative_ce_loss = 0.0
-    cumulative_kl_loss = 0.0
+
+    cumulative_loss = AverageMeter()
+    cumulative_ce_loss = AverageMeter()
+    cumulative_kl_loss = AverageMeter()
+    cumulative_accuracy = AverageMeter()
 
     model.train()
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -273,35 +346,34 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         optimizer.step()
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
-        cumulative_loss += total_loss.item() * batch_size_total
-        cumulative_ce_loss += loss_ce.item() * inputs_base.size(0)
-        cumulative_kl_loss += kl_loss.item() * inputs_novel.size(0)
 
-        samples += batch_size_total
-        ce_samples += inputs_base.size(0)
-        kl_samples += inputs_novel.size(0)
+        cumulative_loss.update(total_loss.item(), n=batch_size_total)
+        cumulative_ce_loss.update(loss_ce.item(), n=inputs_base.size(0))
+        cumulative_kl_loss.update(kl_loss.item(), n=inputs_novel.size(0))
 
         _, predicted = logits_base.max(dim=1)
-        cumulative_accuracy += predicted.eq(targets_base).sum().item()
+        correct = (predicted == targets_base).sum().item()
+        total = targets_base.size(0)
 
-        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy/samples, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
+        cumulative_accuracy.update(correct/total)
+
+        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
 
     return (
-        cumulative_loss / samples,
-        cumulative_accuracy / ce_samples,
-        cumulative_ce_loss / ce_samples,
-        cumulative_kl_loss / kl_samples,
+        cumulative_loss.avg,
+        cumulative_accuracy.avg,
+        cumulative_ce_loss.avg,
+        cumulative_kl_loss.avg,
     )
 
 
 def training_step(model, dataset, optimizer, batch_size, device="cuda"):
-    samples = 0.0
-    cumulative_loss = 0.0
-    cumulative_accuracy = 0.0
+    # Use AverageMeter for loss and accuracy
+    cumulative_loss = AverageMeter()
+    cumulative_accuracy = AverageMeter()
 
     # Set the network to training mode
-
     model.train()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -325,17 +397,18 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
         optimizer.zero_grad()
 
         # Fetch prediction and loss value
-        samples += inputs.shape[0]
-        cumulative_loss += loss.item() * inputs.shape[0]
+        batch_size = inputs.shape[0]
+        cumulative_loss.update(loss.item(), n=batch_size)
         _, predicted = logits.max(dim=1)  # max() returns (maximum_value, index_of_maximum_value)
 
         # Compute training accuracy
-        cumulative_accuracy += predicted.eq(targets).sum().item()
+        correct = predicted.eq(targets).sum().item()
+        cumulative_accuracy.update(correct / batch_size)
 
-        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy / samples )
+        pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy.avg)
         pbar.update(1)
 
-    return cumulative_loss / samples, cumulative_accuracy / samples
+    return cumulative_loss.avg, cumulative_accuracy.avg
 
 
 @torch.no_grad()
@@ -354,8 +427,7 @@ def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, 
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     new_classnames = [CLASS_NAMES[c] for c in new_classnames]
     with model.temporary_classnames(new_classnames):
-        correct = 0
-        total = 0
+        accuracy_meter = AverageMeter()
 
         for images, targets in tqdm(dataloader, desc=label):
             images = images.to(device)
@@ -364,11 +436,10 @@ def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, 
             logits = model(images)
             predictions = logits.argmax(dim=-1)
 
-            correct += (predictions == targets).sum().item()
-            total += targets.size(0)
+            correct = (predictions == targets).sum().item()
+            accuracy_meter.update(correct / targets.size(0))
 
-    accuracy = correct / total
-    return accuracy
+    return accuracy_meter.avg
 
 
 @torch.no_grad()  # we don't want gradients
@@ -395,7 +466,7 @@ def base_test_step(model: CLIP, dataset, categories, batch_size, device, label="
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # here we store the number of correct predictions we will make
-    correct_predictions = 0
+    accuracy_meter = AverageMeter()
     for image, target in tqdm(dataloader, desc=label):
         # base categories range from 0 to 50, while novel ones from 51 to 101
         # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
@@ -414,8 +485,9 @@ def base_test_step(model: CLIP, dataset, categories, batch_size, device, label="
         # here cosine similarity between image and text features and keep the argmax for every row (every image)
         predicted_class = (image_features @ text_features.T).argmax(dim=-1)
         # now we check which are correct, and sum them (False == 0, True == 1)
-        correct_predictions += (predicted_class == target).sum().item()
+
+        correct = (predicted_class == target).sum().item()
+        accuracy_meter.update(correct / target.size(0))
 
     # and now we compute the accuracy
-    accuracy = correct_predictions / len(dataset)
-    return accuracy
+    return accuracy_meter.avg

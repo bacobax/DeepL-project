@@ -76,7 +76,8 @@ if __name__ == "__main__":
             adv_training_epochs=20,
             cnn_model=CNN,
             warmup_epoch=0,
-            warmup_cons_lr=1e-5
+            warmup_cons_lr=1e-5,
+            using_kl_adv=False
         )
 
     train_sys.train()
