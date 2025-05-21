@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
     with open(file_path, "rb") as f:
         cls_cluster_dict = pickle.load(f)
+        print("Loaded cls_cluster_dict:", cls_cluster_dict)
 
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
