@@ -279,6 +279,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         pseudo_base_ids = targets_in_batch[:split_idx]
         pseudo_novel_ids = targets_in_batch[split_idx:]
         for img, label in batch:
+
             if label in pseudo_base_ids:
                 base_samples.append((img, label))
             elif label in pseudo_novel_ids:

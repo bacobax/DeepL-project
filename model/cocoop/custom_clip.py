@@ -94,6 +94,7 @@ class CustomCLIP(nn.Module):
 
         # image: [B, 3, H, W]
         # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
+        #print(f"image device: {image.device} | image encoder device: {next(self.image_encoder.parameters()).device}")
         image_features = self.image_encoder(image.type(self.dtype))
         if image_features.isnan().any():
             raise ValueError("NaN detected in image_features.")

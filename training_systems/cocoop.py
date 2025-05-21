@@ -32,7 +32,7 @@ class CoCoOpSystem:
     def __init__(self, **kwargs):
         # Hyperparameters
         self.batch_size = kwargs.get("batch_size", 16)
-        self.device = kwargs.get("device", "cuda:0")
+        self.device = kwargs.get("device", "cuda")
         self.learning_rate = kwargs.get("learning_rate", 0.002)
         self.weight_decay = kwargs.get("weight_decay", 0.0005)
         self.momentum = kwargs.get("momentum", 0.9)
@@ -53,12 +53,15 @@ class CoCoOpSystem:
 
         self.max_epoch = self.epochs
 
+        print("epochs: ", self.epochs)
         # Logging
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.logger = TensorboardLogger(self.writer)
 
         # Load model
         self.clip_model, preprocess = clip.load(self.cnn_model)
+        self.clip_model = self.clip_model.to(self.device)
+        
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         self.train_base, _ = split_data(self.train_set, self.base_classes)
