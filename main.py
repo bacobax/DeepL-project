@@ -6,7 +6,7 @@ import torch
 import os
 from datetime import datetime
 import pickle
-
+from collections import Counter
 
 if __name__ == "__main__":
     # take the device name from DEVICE env variable
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     with open(file_path, "rb") as f:
         cls_cluster_dict = pickle.load(f)
 
+    print(Counter(cls_cluster_dict.numpy()))
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
     #     "class1": 0,
