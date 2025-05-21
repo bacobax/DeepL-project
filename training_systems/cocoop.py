@@ -35,13 +35,10 @@ def harmonic_mean(a, b):
 
 
 class CoCoOpSystem:
-    def __init__(self, **kwargs):
+    def __init__(self, *, optimizer_configs, **kwargs):
         # Hyperparameters
         self.batch_size = kwargs.get("batch_size", 16)
         self.device = kwargs.get("device", "cuda")
-        self.learning_rate = kwargs.get("learning_rate", 0.002)
-        self.weight_decay = kwargs.get("weight_decay", 0.0005)
-        self.momentum = kwargs.get("momentum", 0.9)
         self.epochs = kwargs.get("epochs", 2)
         self.run_name = kwargs.get("run_name", "exp1")
         self.n_ctx = kwargs.get("n_ctx", 4)
@@ -58,17 +55,13 @@ class CoCoOpSystem:
         self.using_kl_adv = kwargs.get("using_kl_adv", False)
 
         self.max_epoch = self.epochs
+        self.optimizer_configs = optimizer_configs
 
-        print("epochs: ", self.epochs)
-        # Logging
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.logger = TensorboardLogger(self.writer)
 
         self.logger.log_hparams({
             "batch_size": self.batch_size,
-            "learning_rate": self.learning_rate,
-            "weight_decay": self.weight_decay,
-            "momentum": self.momentum,
             "epochs": self.epochs,
             "n_ctx": self.n_ctx,
             "ctx_init": self.ctx_init,
@@ -85,7 +78,7 @@ class CoCoOpSystem:
         # Load model
         self.clip_model, preprocess = clip.load(self.cnn_model)
         self.clip_model = self.clip_model.to(self.device)
-        
+
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         self.train_base, _ = split_data(self.train_set, self.base_classes)
@@ -95,7 +88,9 @@ class CoCoOpSystem:
         resolution = self.clip_model.visual.input_resolution
 
         cfg = EasyDict({
-            "TRAINER": {"COCOOP": {"CTX_LOAD": "./bin/coop/exp1_ctx_only.pth", "N_CTX": self.n_ctx, "CTX_INIT": self.ctx_init, "PREC": "fp16"}},
+            "TRAINER": {
+                "COCOOP": {"CTX_LOAD": "./bin/coop/exp1_ctx_only.pth", "N_CTX": self.n_ctx, "CTX_INIT": self.ctx_init,
+                           "PREC": "fp16"}},
             "INPUT": {"SIZE": [resolution, resolution]}
         })
 
@@ -108,23 +103,30 @@ class CoCoOpSystem:
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
                 param.requires_grad_(False)
+            else:
+                param.requires_grad_(True)
 
         self.cost_function = nn.CrossEntropyLoss()
         self.grl = GradientReversalLayer(lambda_=1.0)
         self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes)).to(self.device, dtype=torch.float16)
-        self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.learning_rate, self.weight_decay, self.momentum)
+
+        self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
+        self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
+
 
     def train(self):
-        self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
+
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
 
         # Base training phase
+
 
         base_end_epoch, _ = self._train_base_phase(best_model_path)
         self.model.load_state_dict(torch.load(best_model_path))
         base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
         self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
+        self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
         # Adversarial phase
         print("Before adv training:", checksum(self.model))
         adv_end_epoch = self._train_adversarial_phase(base_end_epoch, best_model_path)
@@ -305,8 +307,16 @@ class CoCoOpSystem:
         os.makedirs(path, exist_ok=True)
         torch.save(self.model.state_dict(), os.path.join(path, f"{self.run_name}.pth"))
 
-    def get_optimizer(self, model, mlp_adversary, lr, wd, momentum):
-        return SGD([
-            {"params": list(model.parameters()) + list(mlp_adversary.parameters())}
-        ], lr=lr, weight_decay=wd, momentum=momentum)
-
+    def get_optimizer(self, model, mlp_adversary, config):
+        params = [
+            {
+                "params": [p for n, p in model.named_parameters() if "prompt_learner" in n and p.requires_grad],
+                "lr": config.prompt_lr,
+            }
+        ]
+        if mlp_adversary is not None:
+            params.append({
+                "params": mlp_adversary.parameters(),
+                "lr": config.mlp_lr,
+            })
+        return torch.optim.SGD(params, weight_decay=config.weight_decay, momentum=config.momentum)
