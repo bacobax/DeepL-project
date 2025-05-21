@@ -85,7 +85,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.n_cls = original_classnames
 
 
-    def forward(self, image, label=None):
+    def forward(self, image, label=None, get_image_features=False):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 
@@ -134,8 +134,11 @@ class CustomCLIP(nn.Module):
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
-
-            return logits, F.cross_entropy(logits, label)
+            if get_image_features:
+                # If get_image_features is True, return logits and image features
+                return logits, F.cross_entropy(logits, label), image_features
+            else:
+                return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits

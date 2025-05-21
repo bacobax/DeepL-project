@@ -54,6 +54,7 @@ class CoCoOpSystem:
         self.warmup_cons_lr = kwargs.get("warmup_cons_lr", 1e-5)
         self.using_kl_adv = kwargs.get("using_kl_adv", False)
         self.grl_lambda = kwargs.get("grl_lambda", 1.0)
+        self.mlp_opt = kwargs.get("mlp_opt", EasyDict(hidden_dim=512, hidden_layers=2))
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
@@ -74,6 +75,8 @@ class CoCoOpSystem:
             "lambda_adv": self.lambda_adv,
             "cnn_model": self.cnn_model,
             "grl_lambda" : self.grl_lambda,
+            "mlp_hidden_dim": self.mlp_opt.hidden_dim,
+            "mlp_hidden_layers": self.mlp_opt.hidden_layers,
         })
 
         # Load model
@@ -109,7 +112,12 @@ class CoCoOpSystem:
 
         self.cost_function = nn.CrossEntropyLoss()
         self.grl = GradientReversalLayer(lambda_=self.grl_lambda)
-        self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes)).to(self.device, dtype=torch.float16)
+
+        clip_dim = self.clip_model.visual.output_dim
+        self.mlp_adversary = (AdversarialMLP(
+            input_dim=len(self.base_classes)+clip_dim,
+            opt=self.mlp_opt
+        ).to(self.device, dtype=torch.float16))
 
         print(self.optimizer_configs[1])
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
