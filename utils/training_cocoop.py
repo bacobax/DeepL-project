@@ -72,7 +72,7 @@ def adversarial_training_step(
         targets = targets.to(device)
 
         targets_real_category = [tmp_dataset.idx2cat[c.item()] for c in targets]
-        cluster_target = [cls_cluster_dict[int(tl)] for tl in targets_real_category]
+        cluster_target = [int(cls_cluster_dict[int(tl)]) for tl in targets_real_category]
         cluster_target = torch.tensor(
             cluster_target,
             device=targets.device,

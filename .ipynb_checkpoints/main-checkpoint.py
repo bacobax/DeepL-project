@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
     with open(file_path, "rb") as f:
         cls_cluster_dict = pickle.load(f)
+        print("Loaded cls_cluster_dict:", cls_cluster_dict)
 
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
@@ -64,8 +65,8 @@ if __name__ == "__main__":
             learning_rate=0.002,
             weight_decay=0.0001,
             momentum=0.9,
-            epochs=10,
-            run_name=f"adv_kl_training_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            epochs=1,
+            run_name=f"adv_training_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
             class_token_position="end",
@@ -73,10 +74,11 @@ if __name__ == "__main__":
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
             lambda_adv=0.5,
-            adv_training_epochs=10,
+            adv_training_epochs=20,
             cnn_model=CNN,
             warmup_epoch=0,
-            warmup_cons_lr=1e-5
+            warmup_cons_lr=1e-5,
+            using_kl_adv=False
         )
 
     train_sys.train()
