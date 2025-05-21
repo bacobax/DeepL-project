@@ -78,7 +78,6 @@ def adversarial_training_step(
             device=targets.device,
             dtype=torch.float16
         )
-        # === MLP forward pass ===
 
         # Forward pass + loss computation
         logits, ce_loss = model(inputs, targets)
@@ -110,7 +109,7 @@ def adversarial_training_step(
 
         # Compute training accuracy
         correct = predicted.eq(targets).sum().item()
-        accuracy_metric.update(correct / batch_size)
+        accuracy_metric.update(correct, n=batch_size, raw=True)
 
         pbar.set_postfix(
             total_train_loss=total_loss_metric.avg,
@@ -214,7 +213,7 @@ def adversarial_kl_training_step(
         _, predicted = logits_base.max(dim=1)
         correct = (predicted == targets_base).sum().item()
         total = targets_base.size(0)
-        accuracy_meter.update(correct/total)
+        accuracy_meter.update(correct, n=total, raw=True)
 
         pbar.set_postfix(total_loss=total_loss.item(), train_acc=accuracy_meter.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
@@ -355,7 +354,7 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
         correct = (predicted == targets_base).sum().item()
         total = targets_base.size(0)
 
-        cumulative_accuracy.update(correct/total)
+        cumulative_accuracy.update(correct, n=total, raw=True)
 
         pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
@@ -403,7 +402,7 @@ def training_step(model, dataset, optimizer, batch_size, device="cuda"):
 
         # Compute training accuracy
         correct = predicted.eq(targets).sum().item()
-        cumulative_accuracy.update(correct / batch_size)
+        cumulative_accuracy.update(correct, n=batch_size, raw=True)
 
         pbar.set_postfix(train_loss=loss.item(), train_acc=cumulative_accuracy.avg)
         pbar.update(1)
@@ -437,7 +436,7 @@ def finetuned_test_step(model: CustomCLIP, dataset, new_classnames, batch_size, 
             predictions = logits.argmax(dim=-1)
 
             correct = (predictions == targets).sum().item()
-            accuracy_meter.update(correct / targets.size(0))
+            accuracy_meter.update(correct, n=targets.size(0), raw=True)
 
     return accuracy_meter.avg
 
@@ -487,7 +486,7 @@ def base_test_step(model: CLIP, dataset, categories, batch_size, device, label="
         # now we check which are correct, and sum them (False == 0, True == 1)
 
         correct = (predicted_class == target).sum().item()
-        accuracy_meter.update(correct / target.size(0))
+        accuracy_meter.update(correct, n=target.size(0), raw=True)
 
     # and now we compute the accuracy
     return accuracy_meter.avg
