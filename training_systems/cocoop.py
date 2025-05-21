@@ -306,11 +306,10 @@ class CoCoOpSystem:
         at_least_one_improoving = False
         c = start_epoch
         pbar = tqdm(
-            total=self.max_epoch,
+            total=self.adv_training_epochs,
             desc="OVERALL TRAINING - Adversarial",
             position=0,
             leave=True,
-            initial=start_epoch,
         )
         end_adv_training_epoch = start_epoch + self.adv_training_epochs
         # --- Lambda adv warmup ---
