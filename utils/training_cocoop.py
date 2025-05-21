@@ -8,6 +8,7 @@ import random
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
+from utils.metrics import AverageMeter
 
 @torch.no_grad()
 def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None, desc_add=""):
@@ -59,14 +60,12 @@ def adversarial_training_step(
         grl,
         device="cuda"
 ):
-    samples = 0.0
-    kl_samples = 0.0
-    ce_samples = 0.0
-    cumulative_loss = 0.0
-    cumulative_accuracy = 0.0
-    cumulative_ce_loss = 0.0
-    cumulative_kl_loss = 0.0
-    comulative_adv_loss = 0.0
+
+    cumulative_loss = AverageMeter()
+    cumulative_ce_loss = AverageMeter()
+    cumulative_kl_loss = AverageMeter()
+    comulative_adv_loss = AverageMeter()
+    cumulative_accuracy = AverageMeter()
 
 
     model.train()
@@ -132,27 +131,25 @@ def adversarial_training_step(
         optimizer.step()
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
-        cumulative_loss += total_loss.item() * batch_size_total
-        cumulative_ce_loss += loss_ce.item() * inputs_base.size(0)
-        cumulative_kl_loss += kl_loss.item() * inputs_novel.size(0)
-        comulative_adv_loss += loss_bce.item() * inputs_base.size(0)
 
-        samples += batch_size_total
-        ce_samples += inputs_base.size(0)
-        kl_samples += inputs_novel.size(0)
+        cumulative_loss.update(total_loss.item(), n=batch_size_total)
+        cumulative_ce_loss.update(loss_ce.item(), n=inputs_base.size(0))
+        cumulative_kl_loss.update(kl_loss.item(), n=inputs_novel.size(0))
+        comulative_adv_loss.update(loss_bce.item(), n=inputs_base.size(0))
 
         _, predicted = logits_base.max(dim=1)
-        cumulative_accuracy += predicted.eq(targets_base).sum().item()
 
-        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy/samples, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
+        cumulative_accuracy.update(predicted.eq(targets_base).sum().item())
+
+        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
 
     return (
-        cumulative_loss / samples,
-        cumulative_accuracy / ce_samples,
-        cumulative_ce_loss / ce_samples,
-        cumulative_kl_loss / kl_samples,
-        comulative_adv_loss / ce_samples,
+        cumulative_loss.avg,
+        cumulative_accuracy.avg,
+        cumulative_ce_loss.avg,
+        cumulative_kl_loss.avg,
+        comulative_adv_loss.avg,
     )
 
 
