@@ -120,17 +120,13 @@ class CoCoOpSystem:
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
 
         # Base training phase
-
-
         base_end_epoch, _ = self._train_base_phase(best_model_path)
         if self.epochs != 0:
             self.model.load_state_dict(torch.load(best_model_path))
-        #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-        #self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+        base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+        self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
-        #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-        #self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
         checksum1 = checksum(self.model)
         # Adversarial phase
         print("Before adv training:", checksum1)
@@ -140,8 +136,8 @@ class CoCoOpSystem:
         print("After adv training:", checksum2)
         print(f"checksum1: {checksum1}, checksum2: {checksum2}")
 
-        #base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
-        #self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
+        base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
+        self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
 
         self.writer.close()
         self.save_model()
