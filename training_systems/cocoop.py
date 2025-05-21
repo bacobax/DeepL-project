@@ -53,7 +53,7 @@ class CoCoOpSystem:
         self.warmup_epoch = kwargs.get("warmup_epoch", 1)
         self.warmup_cons_lr = kwargs.get("warmup_cons_lr", 1e-5)
         self.using_kl_adv = kwargs.get("using_kl_adv", False)
-
+        self.grl_lambda = kwargs.get("grl_lambda", 1.0)
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
@@ -107,7 +107,7 @@ class CoCoOpSystem:
                 param.requires_grad_(True)
 
         self.cost_function = nn.CrossEntropyLoss()
-        self.grl = GradientReversalLayer(lambda_=1.0)
+        self.grl = GradientReversalLayer(lambda_=self.grl_lambda)
         self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes)).to(self.device, dtype=torch.float16)
 
         print(self.optimizer_configs[1])

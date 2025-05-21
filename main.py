@@ -82,6 +82,7 @@ if __name__ == "__main__":
             warmup_cons_lr=1e-5,
             using_kl_adv=False,
             optimizer_configs=[first_optimizer, second_optimizer],
+            grl_lambda=1.7
         )
 
     train_sys.train()
