@@ -21,8 +21,14 @@ from utils.training_cocoop import (
     adversarial_training_step,
     adversarial_kl_training_step,
 )
+import hashlib
 
 from utils.tensor_board_logger import TensorboardLogger
+
+def checksum(model):
+    with torch.no_grad():
+        all_params = torch.cat([p.view(-1).cpu() for p in model.parameters() if p.requires_grad])
+        return hashlib.md5(all_params.numpy().tobytes()).hexdigest()
 
 def harmonic_mean(a, b):
     return 2 * (a * b) / (a + b)
@@ -113,13 +119,16 @@ class CoCoOpSystem:
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
 
         # Base training phase
+
         base_end_epoch, _ = self._train_base_phase(best_model_path)
         self.model.load_state_dict(torch.load(best_model_path))
         base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
         self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
         # Adversarial phase
+        print("Before adv training:", checksum(self.model))
         adv_end_epoch = self._train_adversarial_phase(base_end_epoch, best_model_path)
+        print("After adv training:", checksum(self.model))
         base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
         self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
 
@@ -249,6 +258,7 @@ class CoCoOpSystem:
             if last_model_state is not None:
                 self.model.load_state_dict(last_model_state)
                 print("Loaded last adversarial model state.")
+
 
         return start_epoch + self.adv_training_epochs
 
