@@ -58,6 +58,24 @@ class CoCoOpSystem:
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.logger = TensorboardLogger(self.writer)
 
+        self.logger.log_hparams({
+            "batch_size": self.batch_size,
+            "learning_rate": self.learning_rate,
+            "weight_decay": self.weight_decay,
+            "momentum": self.momentum,
+            "epochs": self.epochs,
+            "n_ctx": self.n_ctx,
+            "ctx_init": self.ctx_init,
+            "class_token_position": self.class_token_position,
+            "csc": self.csc,
+            "lambda_kl_first": self.lambda_kl[0],
+            "lambda_kl_second": self.lambda_kl[1],
+            "warmup_epoch": self.warmup_epoch,
+            "warmup_cons_lr": self.warmup_cons_lr,
+            "lambda_adv": self.lambda_adv,
+            "cnn_model": self.cnn_model,
+        })
+
         # Load model
         self.clip_model, preprocess = clip.load(self.cnn_model)
         self.clip_model = self.clip_model.to(self.device)

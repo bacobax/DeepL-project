@@ -6,6 +6,9 @@ class TensorboardLogger:
     def __init__(self, writer):
         self.writer = writer
 
+    def log_hparams(self, hparams: dict):
+        self.writer.add_hparams(hparam_dict=hparams, metric_dict={})
+
     def log_training_base(self, epoch, lr, ce_loss, acc, kl_loss, total_loss):
         self.writer.add_scalar("learning_rate", lr, epoch)
         self.writer.add_scalar("train_base/ce_loss", ce_loss, epoch)
