@@ -36,7 +36,6 @@ if __name__ == "__main__":
 
     with open(file_path, "rb") as f:
         cls_cluster_dict = pickle.load(f)
-        print("Loaded cls_cluster_dict:", cls_cluster_dict)
 
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
@@ -67,7 +66,7 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=0,
+            epochs=10,
             run_name=f"adv_training_run_2optim_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
@@ -75,7 +74,7 @@ if __name__ == "__main__":
             csc=False,
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
-            lambda_adv=0.3,
+            lambda_adv=0.5,
             adv_training_epochs=10,
             cnn_model=CNN,
             warmup_epoch=0,
