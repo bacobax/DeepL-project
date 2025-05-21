@@ -117,7 +117,13 @@ class CoCoOpSystem:
 
         for e in range(self.max_epoch):
             total_loss, acc, ce_loss, kl_loss = training_step_v2(
-                self.model, self.train_base, self.optimizer, self.batch_size, self.device, self.lambda_kl[0])
+                self.model,
+                self.train_base,
+                self.optimizer,
+                self.batch_size,
+                self.lambda_kl[0],
+                self.device,
+            )
 
             self.logger.log_training_base(
                 e,
