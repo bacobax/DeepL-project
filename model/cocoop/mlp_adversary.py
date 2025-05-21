@@ -29,6 +29,8 @@ class AdversarialMLP(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, 1),
             nn.Sigmoid()
         )
