@@ -27,12 +27,16 @@ class AverageMeter:
         self.sum = 0
         self.count = 0
 
-    def update(self, val, n=1):
+    def update(self, val, n=1, raw=False):
         if isinstance(val, torch.Tensor):
             val = val.item()
 
         self.val = val
-        self.sum += val * n
+        if raw:
+            self.sum += val
+        else:
+            self.sum += val * n
+
         self.count += n
 
         if self.ema:
