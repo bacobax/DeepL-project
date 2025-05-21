@@ -110,6 +110,7 @@ class CoCoOpSystem:
         self.grl = GradientReversalLayer(lambda_=1.0)
         self.mlp_adversary = AdversarialMLP(input_dim=len(self.base_classes)).to(self.device, dtype=torch.float16)
 
+        print(self.optimizer_configs[1])
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
@@ -122,9 +123,10 @@ class CoCoOpSystem:
 
 
         base_end_epoch, _ = self._train_base_phase(best_model_path)
-        self.model.load_state_dict(torch.load(best_model_path))
-        base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-        self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+        if self.epochs != 0:
+            self.model.load_state_dict(torch.load(best_model_path))
+        #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+        #self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
         #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
@@ -258,7 +260,7 @@ class CoCoOpSystem:
                     break
             pbar.update(1)
 
-        if at_least_one_improving:
+        if at_least_one_improving and self.epochs != 0:
             self.model.load_state_dict(torch.load(best_model_path))
             print("Loaded best model from adversarial checkpoint.")
 
@@ -267,7 +269,6 @@ class CoCoOpSystem:
             if last_model_state is not None:
                 self.model.load_state_dict(last_model_state)
                 print("Loaded last adversarial model state.")
-
 
         return start_epoch + self.adv_training_epochs
 
@@ -300,7 +301,7 @@ class CoCoOpSystem:
     def _lr_lambda(self, current_epoch):
         if current_epoch < self.warmup_epoch:
             return self.warmup_cons_lr / self.learning_rate
-        return 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch)))
+        return 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch + 1e-7)))
 
     def compute_evaluation(self, epoch_idx, base=False):
         model = self.model if not base else self.clip_model

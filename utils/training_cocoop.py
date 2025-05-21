@@ -102,13 +102,15 @@ def adversarial_training_step(
 
         # Backward pass
         total_loss.backward()
-        if batch_idx < 3:
+        """if batch_idx < 3:
             check_gradients(model)
-            check_gradients(mlp_adversary)
+            check_gradients(mlp_adversary)"""
 
         torch.nn.utils.clip_grad_norm_(
             list(model.parameters()) + list(mlp_adversary.parameters()),
-            max_norm=2.0
+            max_norm=1.0,
+            norm_type=2.0,
+            error_if_nonfinite=True
         )
 
         # Parameters update
@@ -116,6 +118,12 @@ def adversarial_training_step(
 
         # Gradients reset
         optimizer.zero_grad()
+
+        if batch_idx < 3:  # Log only a few batches for performance
+            print(f"[Batch {batch_idx}] CE Loss: {ce_loss.item():.4f} | "
+                  f"Adv Loss: {loss_bce.item():.4f} | "
+                  f"Total Loss: {total_loss.item():.4f} | "
+                  f"lambda_adv: {lambda_adv:.4f}")
 
         # Fetch prediction and loss value
         batch_size = inputs.shape[0]
