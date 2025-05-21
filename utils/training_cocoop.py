@@ -91,9 +91,8 @@ def adversarial_training_step(
 
         # Forward pass + loss computation
         logits, ce_loss, img_features = model(inputs, targets, get_image_features=True)
-        mlp_input_logits = logits / logits.norm(dim=-1, keepdim=True)
         # === Adversarial loss ===
-        reversed_logits = grl(torch.cat([img_features, mlp_input_logits], dim=1))
+        reversed_logits = grl(torch.cat([img_features, logits], dim=1))
         cluster_logits = mlp_adversary(reversed_logits).squeeze()
         loss_bce = F.binary_cross_entropy(cluster_logits, cluster_target)
 

@@ -132,8 +132,8 @@ class CoCoOpSystem:
         base_end_epoch, _ = self._train_base_phase(best_model_path)
         if self.epochs != 0:
             self.model.load_state_dict(torch.load(best_model_path))
-        base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-        self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+        #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+        #self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
         checksum1 = checksum(self.model)

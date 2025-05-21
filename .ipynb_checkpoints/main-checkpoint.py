@@ -46,8 +46,8 @@ if __name__ == "__main__":
     # }
 
     first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0005, momentum=0.9)  # for base training
-    second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.001, weight_decay=0.0005, momentum=0.8)  # for adversarial training
-
+    second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.004, weight_decay=0.0005, momentum=0.8)  # for adversarial training
+    mlp_opt = EasyDict(hidden_dim=512, hidden_layers=3)
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -66,21 +66,23 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=10,
-            run_name=f"adv_training_run_2optim_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            epochs=0,
+            run_name=f"adv_training_run_2optim_img_ft{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
             class_token_position="end",
             csc=False,
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
-            lambda_adv=0.5,
+            lambda_adv=1,
             adv_training_epochs=10,
             cnn_model=CNN,
             warmup_epoch=0,
             warmup_cons_lr=1e-5,
             using_kl_adv=False,
             optimizer_configs=[first_optimizer, second_optimizer],
+            grl_lambda=5,
+            mlp_opt=mlp_opt,
         )
 
     train_sys.train()
