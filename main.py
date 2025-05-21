@@ -1,3 +1,5 @@
+from easydict import EasyDict
+
 from training_systems.cocoop import CoCoOpSystem
 from training_systems.coop import CoOpSystem
 import torch
@@ -44,6 +46,10 @@ if __name__ == "__main__":
     #     # Add more classes and their corresponding cluster IDs
     # }
 
+    first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0005, momentum=0.9),  # for base training
+    second_optimizer = EasyDict(prompt_lr=0.04, mlp_lr=0.5, weight_decay=0.0001, momentum=0.8)  # for adversarial training
+
+
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -62,9 +68,6 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            learning_rate=0.002,
-            weight_decay=0.0001,
-            momentum=0.9,
             epochs=1,
             run_name=f"adv_training_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
@@ -78,7 +81,8 @@ if __name__ == "__main__":
             cnn_model=CNN,
             warmup_epoch=0,
             warmup_cons_lr=1e-5,
-            using_kl_adv=False
+            using_kl_adv=False,
+            optimizer_configs=[first_optimizer, second_optimizer],
         )
 
     train_sys.train()
