@@ -8,6 +8,16 @@ import random
 from model.cocoop.custom_clip import CustomCLIP
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 from utils.metrics import AverageMeter
+def check_gradients(model):
+    print("=== Checking gradients ===")
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            if param.grad is None:
+                print(f"{name}: ❌ No gradient")
+            elif torch.all(param.grad == 0):
+                print(f"{name}: ⚠️ Zero gradient")
+            else:
+                print(f"{name}: ✅ Gradient flowing")
 
 @torch.no_grad()
 def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None, desc_add=""):
@@ -93,6 +103,8 @@ def adversarial_training_step(
         # Backward pass
         total_loss.backward()
 
+        check_gradients(model)
+        check_gradients(mlp_adversary)
         # Parameters update
         optimizer.step()
 
