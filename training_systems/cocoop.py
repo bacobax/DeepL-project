@@ -108,6 +108,12 @@ class CoCoOpSystem:
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
                 param.requires_grad_(False)
+            else:
+                param.requires_grad_(True)
+
+        for name, param in self.model.named_parameters():
+            if "prompt_learner" in name:
+                print(name, param.requires_grad)
 
         self.cost_function = nn.CrossEntropyLoss()
         self.grl = GradientReversalLayer(lambda_=1.0)
@@ -196,7 +202,15 @@ class CoCoOpSystem:
         for e in range(start_epoch, start_epoch + self.adv_training_epochs):
             progress = (e - start_epoch + 1) / warmup_epochs
             lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
-
+            with torch.no_grad():
+                delta = 0
+                count = 0
+                for name, param in self.model.named_parameters():
+                    if "prompt_learner" in name and param.requires_grad:
+                        delta += param.abs().sum().item()
+                        count += param.numel()
+                print(f"[Epoch {e}] Prompt learner avg param value: {delta / count:.6e}")
+                
             if self.using_kl_adv:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = adversarial_kl_training_step(
                     model=self.model,
@@ -223,6 +237,8 @@ class CoCoOpSystem:
                     device=self.device
                 )
                 kl_loss = None
+
+            
 
             self.logger.log_training_adv(
                 e,
