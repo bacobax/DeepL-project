@@ -102,9 +102,15 @@ def adversarial_training_step(
 
         # Backward pass
         total_loss.backward()
+        if batch_idx < 3:
+            check_gradients(model)
+            check_gradients(mlp_adversary)
 
-        check_gradients(model)
-        check_gradients(mlp_adversary)
+        torch.nn.utils.clip_grad_norm_(
+            list(model.parameters()) + list(mlp_adversary.parameters()),
+            max_norm=2.0
+        )
+
         # Parameters update
         optimizer.step()
 
