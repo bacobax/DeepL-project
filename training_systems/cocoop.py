@@ -53,6 +53,7 @@ class CoCoOpSystem:
         self.grl_lambda = kwargs.get("grl_lambda", 1.0)
         self.mlp_opt = kwargs.get("mlp_opt", EasyDict(hidden_dim=512, hidden_layers=2))
         self.skip_tests = kwargs.get("skip_tests", [False, False, False])
+        self.train_base_checkpoint_path = kwargs.get("train_base_checkpoint_path", None)
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
@@ -147,16 +148,21 @@ class CoCoOpSystem:
     def train(self):
 
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+        if self.train_base_checkpoint_path is None:
+            # Base training phase
+            base_end_epoch, _ = self._train_base_phase(best_model_path)
+            if self.epochs != 0:
+                self.model.load_state_dict(torch.load(best_model_path))
 
-        # Base training phase
-        base_end_epoch, _ = self._train_base_phase(best_model_path)
-        if self.epochs != 0:
-            self.model.load_state_dict(torch.load(best_model_path))
-
-        if not self.skip_tests[1]:
-            print("Skipping base accuracy test")
-            base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-            self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+            if not self.skip_tests[1]:
+                print("Skipping base accuracy test")
+                base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+                self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+        else:
+            base_end_epoch = 0
+            print("Skipping base training")
+            # Load the model from the checkpoint
+            self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
         checksum1 = checksum(self.model)
