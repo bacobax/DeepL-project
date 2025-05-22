@@ -288,10 +288,10 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
 
 def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="cuda"):
 
-    cumulative_loss = AverageMeter()
-    cumulative_ce_loss = AverageMeter()
-    cumulative_kl_loss = AverageMeter()
-    cumulative_accuracy = AverageMeter()
+    total_loss_metric = AverageMeter()
+    ce_loss_metric = AverageMeter()
+    kl_loss_metric = AverageMeter()
+    accuracy_metric = AverageMeter()
 
     model.train()
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -372,24 +372,24 @@ def training_step_v2(model, dataset, optimizer, batch_size, lambda_kl, device="c
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
 
-        cumulative_loss.update(total_loss.item(), n=batch_size_total)
-        cumulative_ce_loss.update(loss_ce.item(), n=inputs_base.size(0))
-        cumulative_kl_loss.update(kl_loss.item(), n=inputs_novel.size(0))
+        total_loss_metric.update(total_loss.item(), n=batch_size_total)
+        ce_loss_metric.update(loss_ce.item(), n=inputs_base.size(0))
+        kl_loss_metric.update(kl_loss.item(), n=inputs_novel.size(0))
 
         _, predicted = logits_base.max(dim=1)
         correct = (predicted == targets_base).sum().item()
         total = targets_base.size(0)
 
-        cumulative_accuracy.update(correct, n=total, raw=True)
+        accuracy_metric.update(correct, n=total, raw=True)
 
-        pbar.set_postfix(total_loss=total_loss.item(), train_acc=cumulative_accuracy.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
+        pbar.set_postfix(total_loss=total_loss.item(), train_acc=accuracy_metric.avg, loss_ce=loss_ce.item(), kl_loss=kl_loss.item())
         pbar.update(1)
 
     return (
-        cumulative_loss.avg,
-        cumulative_accuracy.avg,
-        cumulative_ce_loss.avg,
-        cumulative_kl_loss.avg,
+        total_loss_metric.avg,
+        accuracy_metric.avg,
+        ce_loss_metric.avg,
+        kl_loss_metric.avg,
     )
 
 

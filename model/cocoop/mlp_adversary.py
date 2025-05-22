@@ -32,20 +32,17 @@ class AdversarialMLP(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.1),
             *[
                 nn.Sequential(
                     nn.Linear(hidden_dim, hidden_dim),
                     nn.ReLU(),
-                    nn.Dropout(0.2),
+                    nn.Dropout(0.1),
                 )
                 for _ in range(hidden_layers - 1)
             ],
             nn.Linear(hidden_dim, 1),
-            nn.Sigmoid(),
         )
-
-
 
     def forward(self, x):
         return self.model(x)

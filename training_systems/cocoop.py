@@ -24,6 +24,8 @@ from utils.training_cocoop import (
 import hashlib
 
 from utils.tensor_board_logger import TensorboardLogger
+from training_systems.training_methods import TrainingMethod, Adversarial, KLAdversarial, KLCoCoOp
+from training_systems.FullForwardPass import train_step
 
 def checksum(model):
     with torch.no_grad():
@@ -123,7 +125,6 @@ class CoCoOpSystem:
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
-
     def train(self):
 
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
@@ -156,16 +157,18 @@ class CoCoOpSystem:
         patience = 4
         patience_counter = 0
         c = 0
+        method = KLCoCoOp(
+            model=self.model,
+            optimizer=self.optimizer,
+            lambda_kl=self.lambda_kl[0],
+        )
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
 
         for e in range(self.max_epoch):
-            total_loss, acc, ce_loss, kl_loss = training_step_v2(
-                self.model,
+
+            total_loss, acc, ce_loss, kl_loss = method.train_step(
                 self.train_base,
-                self.optimizer,
                 self.batch_size,
-                self.lambda_kl[0],
-                self.device,
             )
 
             self.logger.log_training_base(
@@ -205,40 +208,44 @@ class CoCoOpSystem:
 
         last_model_state = None  # store last model state
 
+        method = Adversarial(
+            lambda_adv=initial_lambda_adv,
+            model=self.model,
+            optimizer=self.optimizer,
+            cls_cluster_dict=self.cls_cluster_dict,
+            grl=self.grl,
+            mlp_adversary=self.mlp_adversary,
+        ) if not self.using_kl_adv else KLAdversarial(
+            lambda_adv=initial_lambda_adv,
+            model=self.model,
+            optimizer=self.optimizer,
+            cls_cluster_dict=self.cls_cluster_dict,
+            grl=self.grl,
+            mlp_adversary=self.mlp_adversary,
+            lambda_kl=self.lambda_kl[1]
+        )
+
         for e in range(start_epoch, start_epoch + self.adv_training_epochs):
             progress = (e - start_epoch + 1) / warmup_epochs
-            lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
+            new_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
+
+            method.update_lambda_adv(new_lambda_adv)
 
             if self.using_kl_adv:
-                total_loss, acc, ce_loss, kl_loss, adv_loss = adversarial_kl_training_step(
-                    model=self.model,
-                    dataset=self.train_base,
-                    optimizer=self.optimizer,
-                    batch_size=self.batch_size,
-                    cls_cluster_dict=self.cls_cluster_dict,
-                    lambda_adv=lambda_adv,
-                    mlp_adversary=self.mlp_adversary,
-                    grl=self.grl,
-                    device=self.device,
-                    lambda_kl=self.lambda_kl[1]
+                total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
+                    self.train_base,
+                    self.batch_size,
                 )
             else:
-                total_loss, acc, ce_loss, adv_loss = adversarial_training_step(
-                    model=self.model,
-                    dataset=self.train_base,
-                    optimizer=self.optimizer,
-                    batch_size=self.batch_size,
-                    cls_cluster_dict=self.cls_cluster_dict,
-                    lambda_adv=lambda_adv,
-                    mlp_adversary=self.mlp_adversary,
-                    grl=self.grl,
-                    device=self.device
+                total_loss, acc, ce_loss, adv_loss = method.train_step(
+                    self.train_base,
+                    self.batch_size,
                 )
                 kl_loss = None
 
             self.logger.log_training_adv(
                 e,
-                lambda_adv,
+                method.lambda_adv,
                 ce_loss,
                 acc,
                 adv_loss,
@@ -305,7 +312,7 @@ class CoCoOpSystem:
 
     def _lr_lambda(self, current_epoch):
         if current_epoch < self.warmup_epoch:
-            return self.warmup_cons_lr / self.learning_rate
+            return self.warmup_cons_lr / self.optimizer_configs[0].prompt_lr
         return 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch + 1e-7)))
 
     def compute_evaluation(self, epoch_idx, base=False):
