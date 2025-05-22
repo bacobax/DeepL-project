@@ -57,7 +57,7 @@ if __name__ == "__main__":
     #     # Add more classes and their corresponding cluster IDs
     # }
 
-    first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0005, momentum=0.9)  # for base training
+    first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0001, momentum=0.9)  # for base training
     second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.004, weight_decay=0.0005, momentum=0.8)  # for adversarial training
     mlp_opt = EasyDict(hidden_dim=592, hidden_layers=3)
     if use_coop:
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             device=device,
             epochs=10,
             run_name=run_name,
-            n_ctx=4,
+            n_ctx=8,
             ctx_init="",
             class_token_position="end",
             csc=False,

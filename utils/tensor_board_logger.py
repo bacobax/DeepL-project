@@ -2,9 +2,9 @@ import os
 
 from torch.utils.tensorboard import SummaryWriter
 
-
 def harmonic_mean(a, b):
     return 2 * (a * b) / (a + b)
+    
 
 class CSVLogger:
     def __init__(self, filename):
@@ -16,18 +16,21 @@ class CSVLogger:
     def log(self, epoch, base_acc, novel_acc):
         hm = harmonic_mean(base_acc, novel_acc)
         self.file.write(f"{epoch},{base_acc},{novel_acc},{hm}\n")
+        self.file.flush()
         print(f"Logged: epoch {epoch}, base_acc {base_acc}, novel_acc {novel_acc}, harmonic_mean {hm}")
 
     def close(self):
         self.file.close()
+        
 
 class TensorboardLogger:
     def __init__(self, writer: SummaryWriter):
         self.writer = writer
         self.csv_logger = CSVLogger(f"{writer.log_dir}/metrics.csv")
+        self.hparams = None
 
     def log_hparams(self, hparams: dict):
-        self.writer.add_hparams(hparam_dict=hparams, metric_dict={})
+        self.hparams = hparams
 
     def log_training_base(self, epoch, lr, ce_loss, acc, kl_loss, total_loss):
         self.writer.add_scalar("learning_rate", lr, epoch)
@@ -53,12 +56,25 @@ class TensorboardLogger:
         self.writer.add_scalar(f"{prefix}_novel/accuracy", novel_acc, epoch)
 
     def log_final_metrics(self, tag, base_acc, novel_acc, step):
+        harmonic = harmonic_mean(base_acc, novel_acc)
         self.writer.add_scalars(tag, {
-            "Harmonic Mean": harmonic_mean(base_acc, novel_acc),
+            "Harmonic Mean": harmonic,
             "Base Accuracy": base_acc,
             "Novel Accuracy": novel_acc,
         }, global_step=step + 1)
+
         self.csv_logger.log(step + 1, base_acc, novel_acc)
+
+        if self.hparams is not None:
+            self.writer.add_hparams(
+                hparam_dict=self.hparams,
+                metric_dict={
+                    "Harmonic Mean": harmonic,
+                    "Base Accuracy": base_acc,
+                    "Novel Accuracy": novel_acc,
+                }
+            )
+        self.writer.flush()
 
     def log_test_accuracy(self, step, acc, label):
         self.writer.add_scalar(f"{label}/accuracy", acc, step)
