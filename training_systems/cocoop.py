@@ -214,6 +214,13 @@ class CoCoOpSystem:
                     print(f"Early stopping at epoch {e}")
                     break
             self.lr_scheduler.step()
+            pbar.set_postfix(
+                ce_loss=ce_loss,
+                kl_loss=kl_loss,
+                base_val_acc=base_val_acc,
+                lr=self.optimizer.param_groups[0]["lr"],
+                patience_counter=patience_counter,
+            )
             pbar.update(1)
             c += 1
 
@@ -278,6 +285,14 @@ class CoCoOpSystem:
                 if patience_counter >= patience:
                     print(f"Early stopping adversarial at epoch {e}")
                     break
+            pbar.set_postfix(
+                ce_loss=ce_loss,
+                kl_loss=kl_loss,
+                adv_loss=adv_loss,
+                base_val_acc=base_val_acc,
+                lr=self.optimizer.param_groups[0]["lr"],
+                patience_counter=patience_counter,
+            )
             pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:
