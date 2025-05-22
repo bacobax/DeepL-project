@@ -37,7 +37,7 @@ if __name__ == "__main__":
     with open(file_path, "rb") as f:
         cls_cluster_dict = pickle.load(f)
 
-    print(Counter(cls_cluster_dict.numpy()))
+    print(Counter(cls_cluster_dict.values()))
     # dictionary to map class names to cluster IDs
     # cls_cluster_dict = {
     #     "class1": 0,
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0005, momentum=0.9)  # for base training
     second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.004, weight_decay=0.0005, momentum=0.8)  # for adversarial training
-    mlp_opt = EasyDict(hidden_dim=512, hidden_layers=3)
+    mlp_opt = EasyDict(hidden_dim=256, hidden_layers=3)
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=0,
+            epochs=10,
             run_name=f"adv_training_run_2optim_img_ft{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             csc=False,
             lambda_kl=[0.5, 0.1],
             cls_cluster_dict=cls_cluster_dict,
-            lambda_adv=1,
+            lambda_adv=0.4,
             adv_training_epochs=10,
             cnn_model=CNN,
             warmup_epoch=0,
