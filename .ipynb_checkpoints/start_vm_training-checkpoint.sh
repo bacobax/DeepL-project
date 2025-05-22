@@ -10,7 +10,7 @@ PYTHON_SCRIPT=main.py  # <-- Replace with your actual entry point
 LOG_DIR=logs
 export DEVICE="cuda"  # or "cpu" if no GPU available
 export USING_COOP="false"
-export RUN_PREFIX="ADV_NO_KL_IMG_FT"
+export RUN_PREFIX="NO_KL_ADV_IMG_FT_8_CTX"
 export RUN_NAME="${RUN_PREFIX}_$(date +"%Y%m%d_%H%M%S")"
 # === Activate Conda ===
 echo "Activating Conda..."

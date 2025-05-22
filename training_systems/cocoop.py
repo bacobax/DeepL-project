@@ -88,10 +88,10 @@ class CoCoOpSystem:
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
         resolution = self.clip_model.visual.input_resolution
-        #"CTX_LOAD": "./bin/coop/exp1_ctx_only.pth"
+        ctx_load = "./bin/coop/exp1_ctx_only.pth" if self.n_ctx == 4 else "./bin/coop/coop_ctx_8.pth"
         cfg = EasyDict({
             "TRAINER": {
-                "COCOOP": {"CTX_LOAD": "./bin/coop/exp1_ctx_only.pth", "N_CTX": self.n_ctx, "CTX_INIT": self.ctx_init,
+                "COCOOP": {"CTX_LOAD": ctx_load, "N_CTX": self.n_ctx, "CTX_INIT": self.ctx_init,
                            "PREC": "fp16"}},
             "INPUT": {"SIZE": [resolution, resolution]}
         })
