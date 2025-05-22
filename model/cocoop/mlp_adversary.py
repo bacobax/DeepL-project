@@ -29,16 +29,23 @@ class AdversarialMLP(nn.Module):
         hidden_dim = opt.hidden_dim
         hidden_layers = opt.hidden_layers
 
-        layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU(), nn.Dropout(0.2)]
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            *[
+                nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(0.2),
+                )
+                for _ in range(hidden_layers - 1)
+            ],
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid(),
+        )
 
-        for _ in range(hidden_layers - 1):
-            layers += [nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Dropout(0.2)]
 
-        layers.append(nn.Linear(hidden_dim, 1))  # No sigmoid here
-
-        self.model = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.model(x)  # Output shape: [B, 1] with raw logits
-
-        
+        return self.model(x)
