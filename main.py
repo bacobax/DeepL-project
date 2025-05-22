@@ -1,4 +1,5 @@
 from easydict import EasyDict
+import argparse
 
 from training_systems.cocoop import CoCoOpSystem
 from training_systems.coop import CoOpSystem
@@ -8,16 +9,26 @@ from datetime import datetime
 import pickle
 from collections import Counter
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', default=os.getenv("DEVICE", "cuda:0"))
+    parser.add_argument('--run_name', default=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    parser.add_argument('--using_coop', default=os.getenv("USING_COOP", "false").lower() in ("1", "true"), type=lambda x: x.lower() in ("1", "true", "yes", "true"))
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    # take the device name from DEVICE env variable
-    device = os.getenv("DEVICE", "cuda:0")
+    args = parse_args()
+
+    device = args.device
+    run_name = args.run_name
+
     print(f"Using device: {device}")
 
     if torch.backends.mps.is_available():
         print("⚠️ Forcing float32 due to MPS limitations")
         torch.set_default_dtype(torch.float32)
 
-    use_coop = os.getenv("USING_COOP", "false").lower() in ("1", "true")
+    use_coop = args.using_coop
 
     print(f"Using {'CoOp' if use_coop else 'CoCoOp'} for training")
 
@@ -57,7 +68,7 @@ if __name__ == "__main__":
             weight_decay=0.0001,
             momentum=0.9,
             epochs=20,
-            run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            run_name=run_name,
             n_ctx=4,
             ctx_init="",
             class_token_position="end",
@@ -68,7 +79,7 @@ if __name__ == "__main__":
             batch_size=10,
             device=device,
             epochs=0,
-            run_name=f"adv_training_run_2optim_img_ft{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            run_name=run_name,
             n_ctx=4,
             ctx_init="",
             class_token_position="end",
