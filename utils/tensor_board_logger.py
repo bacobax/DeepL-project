@@ -21,13 +21,28 @@ class CSVLogger:
 
     def close(self):
         self.file.close()
-        
+
+
+class BaseAndNovelMetrics:
+    def __init__(self):
+        self.tmp = []
+
+    def update(self, epoch, base_acc, novel_acc):
+        self.tmp.append((epoch, base_acc, novel_acc, harmonic_mean(base_acc, novel_acc)))
+
+    def get_metrics(self):
+        if len(self.tmp) == 0:
+            return None
+        return self.tmp
+
+
 
 class TensorboardLogger:
     def __init__(self, writer: SummaryWriter):
         self.writer = writer
         self.csv_logger = CSVLogger(f"{writer.log_dir}/metrics.csv")
         self.hparams = None
+        self.base_and_novel_metrics = BaseAndNovelMetrics()
 
     def log_hparams(self, hparams: dict):
         self.hparams = hparams
@@ -66,19 +81,40 @@ class TensorboardLogger:
         self.csv_logger.log(step + 1, base_acc, novel_acc)
 
         if self.hparams is not None:
-            self.writer.add_hparams(
-                hparam_dict=self.hparams,
-                metric_dict={
-                    "Harmonic Mean": harmonic,
-                    "Base Accuracy": base_acc,
-                    "Novel Accuracy": novel_acc,
-                }
-            )
+            self.base_and_novel_metrics.update(step + 1, base_acc, novel_acc)
+
         self.writer.flush()
 
     def log_test_accuracy(self, step, acc, label):
         self.writer.add_scalar(f"{label}/accuracy", acc, step)
 
     def close(self):
+        metrics = self.base_and_novel_metrics.get_metrics() or []
+
+
+        """
+        metric_dict = {
+            "base_acc_after_base": metrics[0][1] if metrics else 0,
+            "novel_acc_after_base": metrics[0][2] if metrics else 0,
+            "harmonic_mean_after_base": metrics[0][3] if metrics else 0,
+            "base_acc_after_adv": metrics[1][1] if metrics else 0,
+            "novel_acc_after_adv": metrics[1][2] if metrics else 0,
+            "harmonic_mean_after_adv": metrics[1][3] if metrics else 0,
+        }"""
+
+        if self.hparams is not None and metrics:
+
+            tmp = {}
+            for idx, m in enumerate(metrics):
+                prefix = "after_base" if idx == 0 else "after_adv"
+                tmp[f"epoch_{prefix}"] = m[0]
+                tmp[f"base_acc_{prefix}"] = m[1]
+                tmp[f"novel_acc_{prefix}"] = m[2]
+                tmp[f"harmonic_mean_{prefix}"] = m[3]
+
+            self.writer.add_hparams(
+                hparam_dict=self.hparams,
+                metric_dict=tmp,
+            )
         self.writer.close()
         self.csv_logger.close()
