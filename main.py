@@ -57,8 +57,6 @@ if __name__ == "__main__":
     #     # Add more classes and their corresponding cluster IDs
     # }
 
-    first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0001, momentum=0.9)  # for base training
-    second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.01, weight_decay=0.0005, momentum=0.8)  # for adversarial training
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -80,7 +78,19 @@ if __name__ == "__main__":
             device=device,
             run_name=run_name,
             cnn_model=CNN,
-            optimizer_configs=[first_optimizer, second_optimizer],
+            optimizer_configs=[
+                EasyDict(
+                    prompt_lr=0.002,
+                    weight_decay=0.0001,
+                    momentum=0.9
+                ),
+                EasyDict(
+                    prompt_lr=0.002,
+                    mlp_lr=0.01,
+                    weight_decay=0.0005,
+                    momentum=0.8
+                )
+            ],
             skip_tests=[True, True, True],
             train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth",
             # train_base_checkpoint_path=None,
