@@ -68,13 +68,15 @@ class Adversarial(TrainingMethod):
         cluster_target = torch.tensor(
             cluster_target,
             device=targets.device,
-            dtype=torch.float16
+            dtype=torch.float32
         )
+
         # Forward pass + loss computation
         logits, ce_loss, img_features = self.model(inputs, targets, get_image_features=True)
         # === Adversarial loss ===
-        reversed_logits = self.grl(torch.cat([img_features, logits], dim=1))
+        reversed_logits = self.grl(torch.cat([img_features, logits], dim=1).to(dtype=torch.float32))
         cluster_logits = self.mlp_adversary(reversed_logits).squeeze()
+
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
 
         # === Combine losses ===

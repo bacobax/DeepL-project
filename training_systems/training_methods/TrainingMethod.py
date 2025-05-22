@@ -20,7 +20,7 @@ class TrainingMethod(ABC):
         self.model = model
         self.optimizer = optimizer
         self.title = title
-        self.device = self.model.device
+        self.device = next(self.model.parameters()).device
 
     @abstractmethod
     def get_metrics(self) -> Dict[str, AverageMeter]:

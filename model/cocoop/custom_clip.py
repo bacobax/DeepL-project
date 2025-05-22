@@ -53,6 +53,7 @@ class CustomCLIP(nn.Module):
         self.cfg = cfg
 
 
+
     @contextmanager
     def temporary_classnames(self, new_classnames):
         # --- Save original state ---

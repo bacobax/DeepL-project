@@ -22,7 +22,7 @@ class KLCoCoOp(TrainingMethod):
             optimizer: Any,
             lambda_kl
     ) -> None:
-        super().__init__(model, optimizer, "Adv.")
+        super().__init__(model, optimizer, "Base CoCoOp + KL")
         self.lambda_kl = lambda_kl
 
     def get_metrics(self) -> Dict[str, AverageMeter]:

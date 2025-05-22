@@ -67,7 +67,7 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=10,
+            epochs=0,
             run_name=f"adv_training_run_2optim_img_ft{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             n_ctx=4,
             ctx_init="",
