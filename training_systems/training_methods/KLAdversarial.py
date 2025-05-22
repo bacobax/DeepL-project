@@ -27,10 +27,11 @@ class KLAdversarial(TrainingMethod):
             grl: GradientReversalLayer,
             mlp_adversary: AdversarialMLP,
             lambda_adv,
-            lambda_kl
+            lambda_kl,
+            debug: bool = False
 
     ) -> None:
-        super().__init__(model, optimizer, "Adv.")
+        super().__init__(model, optimizer, "Adv.", debug)
         self.cls_cluster_dict = cls_cluster_dict
         self.grl = grl
         self.mlp_adversary = mlp_adversary

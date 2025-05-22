@@ -54,6 +54,7 @@ class CoCoOpSystem:
         self.mlp_opt = kwargs.get("mlp_opt", EasyDict(hidden_dim=512, hidden_layers=2))
         self.skip_tests = kwargs.get("skip_tests", [False, False, False])
         self.train_base_checkpoint_path = kwargs.get("train_base_checkpoint_path", None)
+        self.debug = kwargs.get("debug", False)
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
@@ -118,7 +119,6 @@ class CoCoOpSystem:
             opt=self.mlp_opt
         ).to(self.device))
 
-        print(self.optimizer_configs[1])
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
@@ -129,6 +129,7 @@ class CoCoOpSystem:
             cls_cluster_dict=self.cls_cluster_dict,
             grl=self.grl,
             mlp_adversary=self.mlp_adversary,
+            debug=self.debug,
         ) if not self.using_kl_adv else KLAdversarial(
             lambda_adv=0.05,
             model=self.model,
@@ -136,13 +137,15 @@ class CoCoOpSystem:
             cls_cluster_dict=self.cls_cluster_dict,
             grl=self.grl,
             mlp_adversary=self.mlp_adversary,
-            lambda_kl=self.lambda_kl[1]
+            lambda_kl=self.lambda_kl[1],
+            debug=self.debug,
         )
 
         self.basic_train_method = KLCoCoOp(
             model=self.model,
             optimizer=self.optimizer,
             lambda_kl=self.lambda_kl[0],
+            debug=self.debug,
         )
 
     def train(self):
@@ -153,6 +156,7 @@ class CoCoOpSystem:
             base_end_epoch, _ = self._train_base_phase(best_model_path)
             if self.epochs != 0:
                 self.model.load_state_dict(torch.load(best_model_path))
+                self.save_model(path="./bin/cocoop", prefix="after_first_train_")
 
             if not self.skip_tests[1]:
                 print("Skipping base accuracy test")
@@ -165,16 +169,21 @@ class CoCoOpSystem:
             self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
-        checksum1 = checksum(self.model)
-        # Adversarial phase
-        print("Before adv training:", checksum1)
+
+        checksum1 = None
+        if self.debug:
+            checksum1 = checksum(self.model)
+            # Adversarial phase
+            print("Before adv training:", checksum1)
+
         adv_end_epoch = self._train_adversarial_phase(base_end_epoch, best_model_path)
 
-        checksum2 = checksum(self.model)
-        print("After adv training:", checksum2)
-        print(f"checksum1: {checksum1}, checksum2: {checksum2}")
-        if checksum1 != checksum2:
-            print("Model parameters have changed after adversarial training.")
+        if self.debug and checksum1:
+            checksum2 = checksum(self.model)
+            print("After adv training:", checksum2)
+            print(f"checksum1: {checksum1}, checksum2: {checksum2}")
+            if checksum1 != checksum2:
+                print("Model parameters have changed after adversarial training.")
 
         if not self.skip_tests[2]:
             print("Skipping base accuracy test")
@@ -182,7 +191,7 @@ class CoCoOpSystem:
             self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
 
         self.logger.close()
-        self.save_model()
+        self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
 
     def _train_base_phase(self, best_model_path):
         best_novel_accuracy = 0.0
@@ -352,9 +361,9 @@ class CoCoOpSystem:
         self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "novel_classes")
         return base_accuracy, novel_accuracy
 
-    def save_model(self, path="./bin/cocoop"):
+    def save_model(self, path="./bin/cocoop", prefix=""):
         os.makedirs(path, exist_ok=True)
-        torch.save(self.model.state_dict(), os.path.join(path, f"{self.run_name}.pth"))
+        torch.save(self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth"))
 
     def get_optimizer(self, model, mlp_adversary, config):
         params = [

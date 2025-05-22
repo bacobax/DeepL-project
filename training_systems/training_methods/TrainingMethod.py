@@ -16,11 +16,12 @@ class TrainingMethod(ABC):
     """
     Abstract base class for training methods. it should have forward_backward method to be fulfilled by its children
     """
-    def __init__(self, model: Any, optimizer: Any, title: str) -> None:
+    def __init__(self, model: Any, optimizer: Any, title: str, debug) -> None:
         self.model = model
         self.optimizer = optimizer
         self.title = title
         self.device = next(self.model.parameters()).device
+        self.debug = debug
 
     @abstractmethod
     def get_metrics(self) -> Dict[str, AverageMeter]:

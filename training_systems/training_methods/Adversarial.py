@@ -22,9 +22,10 @@ class Adversarial(TrainingMethod):
             cls_cluster_dict: Dict[int, Any],
             grl: GradientReversalLayer,
             mlp_adversary: AdversarialMLP,
-            lambda_adv
+            lambda_adv,
+            debug: bool = False
     ) -> None:
-        super().__init__(model, optimizer, "Adv.")
+        super().__init__(model, optimizer, "Adv.", debug)
         self.cls_cluster_dict = cls_cluster_dict
         self.grl = grl
         self.mlp_adversary = mlp_adversary
@@ -81,7 +82,7 @@ class Adversarial(TrainingMethod):
 
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
 
-        if batch_idx < 3:
+        if batch_idx < 3 and self.debug:
             ce_grads = self.get_grads(ce_loss)
             bce_grads = self.get_grads(loss_bce)
             self.print_grads_norms(bce_grads, ce_grads)
@@ -104,7 +105,7 @@ class Adversarial(TrainingMethod):
 
         self.optimizer_step()
 
-        if batch_idx < 3:  # Log only a few batches for performance
+        if batch_idx < 3 and self.debug:  # Log only a few batches for performance
             print(f"[Batch {batch_idx}] CE Loss: {ce_loss.item():.4f} | "
                   f"Adv Loss: {loss_bce.item():.4f} | "
                   f"Total Loss: {total_loss.item():.4f} | "

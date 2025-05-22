@@ -96,7 +96,8 @@ if __name__ == "__main__":
             grl_lambda=5,
             mlp_opt=mlp_opt,
             skip_tests=[True, True, True],
-            train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth"
+            train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth",
+            debug=True
         )
 
     train_sys.train()
