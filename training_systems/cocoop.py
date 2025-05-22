@@ -6,7 +6,6 @@ import torch
 from easydict import EasyDict
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from torch.optim import SGD
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 import clip
@@ -16,10 +15,7 @@ from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 from utils.training_cocoop import (
     test_step,
-    training_step_v2,
     eval_step,
-    adversarial_training_step,
-    adversarial_kl_training_step,
 )
 import hashlib
 
@@ -124,6 +120,29 @@ class CoCoOpSystem:
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
+        self.adversarial_method = Adversarial(
+            lambda_adv=0.05,
+            model=self.model,
+            optimizer=self.optimizer,
+            cls_cluster_dict=self.cls_cluster_dict,
+            grl=self.grl,
+            mlp_adversary=self.mlp_adversary,
+        ) if not self.using_kl_adv else KLAdversarial(
+            lambda_adv=0.05,
+            model=self.model,
+            optimizer=self.optimizer,
+            cls_cluster_dict=self.cls_cluster_dict,
+            grl=self.grl,
+            mlp_adversary=self.mlp_adversary,
+            lambda_kl=self.lambda_kl[1]
+        )
+
+        self.basic_train_method = KLCoCoOp(
+            model=self.model,
+            optimizer=self.optimizer,
+            lambda_kl=self.lambda_kl[0],
+        )
+
     def train(self):
 
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
@@ -156,11 +175,8 @@ class CoCoOpSystem:
         patience = 4
         patience_counter = 0
         c = 0
-        method = KLCoCoOp(
-            model=self.model,
-            optimizer=self.optimizer,
-            lambda_kl=self.lambda_kl[0],
-        )
+        method = self.basic_train_method
+
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
 
         for e in range(self.max_epoch):
@@ -207,22 +223,7 @@ class CoCoOpSystem:
 
         last_model_state = None  # store last model state
 
-        method = Adversarial(
-            lambda_adv=initial_lambda_adv,
-            model=self.model,
-            optimizer=self.optimizer,
-            cls_cluster_dict=self.cls_cluster_dict,
-            grl=self.grl,
-            mlp_adversary=self.mlp_adversary,
-        ) if not self.using_kl_adv else KLAdversarial(
-            lambda_adv=initial_lambda_adv,
-            model=self.model,
-            optimizer=self.optimizer,
-            cls_cluster_dict=self.cls_cluster_dict,
-            grl=self.grl,
-            mlp_adversary=self.mlp_adversary,
-            lambda_kl=self.lambda_kl[1]
-        )
+        method = self.adversarial_method
 
         for e in range(start_epoch, start_epoch + self.adv_training_epochs):
             progress = (e - start_epoch + 1) / warmup_epochs
