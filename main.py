@@ -59,7 +59,6 @@ if __name__ == "__main__":
 
     first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0001, momentum=0.9)  # for base training
     second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.01, weight_decay=0.0005, momentum=0.8)  # for adversarial training
-    mlp_opt = EasyDict(hidden_dim=592, hidden_layers=3)
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -75,30 +74,42 @@ if __name__ == "__main__":
             csc=False,
         )
     else:
+
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=10,
             run_name=run_name,
-            n_ctx=8,
-            ctx_init="",
-            class_token_position="end",
-            csc=False,
-            lambda_kl=[0.1, 0.1],
-            cls_cluster_dict=cls_cluster_dict,
-            lambda_adv=0.5,
-            adv_training_epochs=10,
             cnn_model=CNN,
-            warmup_epoch=2,
-            warmup_cons_lr=1e-5,
-            using_kl_adv=False,
             optimizer_configs=[first_optimizer, second_optimizer],
-            grl_lambda=5,
-            mlp_opt=mlp_opt,
             skip_tests=[True, True, True],
             train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth",
-            #train_base_checkpoint_path=None,
-            debug=True
+            # train_base_checkpoint_path=None,
+            debug=True,
+            prompt_learner_opt=EasyDict(
+                n_ctx=8,
+                ctx_init="",
+                class_token_position="end",
+                csc=False,
+            ),
+            kl_loss_opt=EasyDict(
+                lambda_kl=[0.1, 0.1],
+                using_kl_adv=False,
+            ),
+            adv_training_opt=EasyDict(
+                adv_training_epochs=10,
+                cls_cluster_dict=cls_cluster_dict,
+                lambda_adv=0.5,
+                grl_lambda=5,
+                mlp_opt=EasyDict(
+                    hidden_dim=592,
+                    hidden_layers=3
+                ),
+            ),
+            base_training_opt=EasyDict(
+                warmup_epoch=2,
+                warmup_cons_lr=1e-5,
+                epochs=10,
+            ),
         )
 
     train_sys.train()

@@ -32,29 +32,43 @@ def harmonic_mean(a, b):
 
 
 class CoCoOpSystem:
-    def __init__(self, *, optimizer_configs, **kwargs):
-        # Hyperparameters
-        self.batch_size = kwargs.get("batch_size", 16)
-        self.device = kwargs.get("device", "cuda")
-        self.epochs = kwargs.get("epochs", 2)
-        self.run_name = kwargs.get("run_name", "exp1")
-        self.n_ctx = kwargs.get("n_ctx", 4)
-        self.ctx_init = kwargs.get("ctx_init", "")
-        self.class_token_position = kwargs.get("class_token_position", "end")
-        self.csc = kwargs.get("csc", False)
-        self.lambda_kl = kwargs.get("lambda_kl", [0.5, 0.5])
-        self.cls_cluster_dict = kwargs.get("cls_cluster_dict", None)
-        self.lambda_adv = kwargs.get("lambda_adv", 0.5)
-        self.adv_training_epochs = kwargs.get("adv_training_epochs", 2)
-        self.cnn_model = kwargs.get("cnn_model", "ViT-B/32")
-        self.warmup_epoch = kwargs.get("warmup_epoch", 1)
-        self.warmup_cons_lr = kwargs.get("warmup_cons_lr", 1e-5)
-        self.using_kl_adv = kwargs.get("using_kl_adv", False)
-        self.grl_lambda = kwargs.get("grl_lambda", 1.0)
-        self.mlp_opt = kwargs.get("mlp_opt", EasyDict(hidden_dim=512, hidden_layers=2))
-        self.skip_tests = kwargs.get("skip_tests", [False, False, False])
-        self.train_base_checkpoint_path = kwargs.get("train_base_checkpoint_path", None)
-        self.debug = kwargs.get("debug", False)
+    def __init__(
+            self,
+            *,
+            batch_size=16,
+            device="cuda",
+            run_name="exp1",
+            cnn_model="ViT-B/32",
+            optimizer_configs=None,
+            skip_tests=None,
+            train_base_checkpoint_path=None,
+            debug=False,
+            prompt_learner_opt=None,
+            kl_loss_opt=None,
+            adv_training_opt=None,
+            base_training_opt=None,
+    ):
+        self.batch_size = batch_size
+        self.device = device
+        self.epochs = base_training_opt.epochs
+        self.run_name = run_name
+        self.n_ctx = prompt_learner_opt.n_ctx
+        self.ctx_init = prompt_learner_opt.ctx_init
+        self.class_token_position = prompt_learner_opt.class_token_position
+        self.csc = prompt_learner_opt.csc
+        self.lambda_kl = kl_loss_opt.lambda_kl
+        self.cls_cluster_dict = adv_training_opt.cls_cluster_dict
+        self.lambda_adv = adv_training_opt.lambda_adv
+        self.adv_training_epochs = adv_training_opt.adv_training_epochs
+        self.cnn_model = cnn_model
+        self.warmup_epoch = base_training_opt.warmup_epoch
+        self.warmup_cons_lr = base_training_opt.warmup_cons_lr
+        self.using_kl_adv = kl_loss_opt.using_kl_adv
+        self.grl_lambda = adv_training_opt.grl_lambda
+        self.mlp_opt = adv_training_opt.mlp_opt
+        self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]
+        self.train_base_checkpoint_path = train_base_checkpoint_path
+        self.debug = debug
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
