@@ -73,11 +73,17 @@ class Adversarial(TrainingMethod):
 
         # Forward pass + loss computation
         logits, ce_loss, img_features = self.model(inputs, targets, get_image_features=True)
+
         # === Adversarial loss ===
         reversed_logits = self.grl(torch.cat([img_features, logits], dim=1).to(dtype=torch.float32))
         cluster_logits = self.mlp_adversary(reversed_logits).squeeze()
 
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
+
+        if batch_idx < 3:
+            ce_grads = self.get_grads(ce_loss)
+            bce_grads = self.get_grads(loss_bce)
+            self.print_grads_norms(bce_grads, ce_grads)
 
         # === Combine losses ===
         total_loss = ce_loss + self.lambda_adv * loss_bce
@@ -121,6 +127,22 @@ class Adversarial(TrainingMethod):
             "adv_loss": loss_bce.item(),
             "accuracy": correct / batch_size,
         }
+
+    def print_grads_norms(self, bce_grads, ce_grads):
+        for name in ce_grads:
+            ce_norm = ce_grads[name].norm().item()
+            bce_norm = bce_grads[name].norm().item()
+            print(f"{name}: CE grad norm = {ce_norm:.4e}, BCE grad norm = {bce_norm:.4e}")
+
+    def get_grads(self, loss):
+        loss.backward(retain_graph=True)
+        ce_grads = {}
+        for name, p in self.model.named_parameters():
+            if p.grad is not None and "prompt_learner" in name:
+                ce_grads[name] = p.grad.detach().clone()
+        # --- Zero gradients ---
+        self.optimizer.zero_grad()
+        return ce_grads
 
     def debug_metrics_to_pbar_args(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
         return debug_metrics
