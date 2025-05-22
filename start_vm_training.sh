@@ -22,11 +22,11 @@ mkdir -p $LOG_DIR
 
 # === Run training ===
 echo "Starting training on $DEVICE..."
-python $PYTHON_SCRIPT --device $DEVICE --run_name $RUN_NAME --using_coop $USING_COOP | tee $LOG_DIR/train_$(date +"%Y%m%d_%H%M%S").log
-
-# Git operations
-cd "runs/CoCoOp/"
-git add "$RUN_NAME"
-git commit -m "Add logs for $RUN_NAME"
-git push
-cd ../..
+if python $PYTHON_SCRIPT --device $DEVICE --run_name $RUN_NAME --using_coop $USING_COOP | tee $LOG_DIR/train_$(date +"%Y%m%d_%H%M%S").log; then
+  # Git operations
+  cd "runs/CoCoOp/"
+  git add "$RUN_NAME"
+  git commit -m "Add logs for $RUN_NAME"
+  git push
+  cd ../..
+fi
