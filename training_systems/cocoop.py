@@ -52,6 +52,7 @@ class CoCoOpSystem:
         self.using_kl_adv = kwargs.get("using_kl_adv", False)
         self.grl_lambda = kwargs.get("grl_lambda", 1.0)
         self.mlp_opt = kwargs.get("mlp_opt", EasyDict(hidden_dim=512, hidden_layers=2))
+        self.skip_tests = kwargs.get("skip_tests", [False, False, False])
         self.max_epoch = self.epochs
         self.optimizer_configs = optimizer_configs
 
@@ -151,8 +152,11 @@ class CoCoOpSystem:
         base_end_epoch, _ = self._train_base_phase(best_model_path)
         if self.epochs != 0:
             self.model.load_state_dict(torch.load(best_model_path))
-        #base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-        #self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+
+        if not self.skip_tests[1]:
+            print("Skipping base accuracy test")
+            base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+            self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
 
         self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
         checksum1 = checksum(self.model)
@@ -163,11 +167,15 @@ class CoCoOpSystem:
         checksum2 = checksum(self.model)
         print("After adv training:", checksum2)
         print(f"checksum1: {checksum1}, checksum2: {checksum2}")
-    
-        #base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
-        #self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
+        if checksum1 != checksum2:
+            print("Model parameters have changed after adversarial training.")
 
-        self.writer.close()
+        if not self.skip_tests[2]:
+            print("Skipping base accuracy test")
+            base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
+            self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
+
+        self.logger.close()
         self.save_model()
 
     def _train_base_phase(self, best_model_path):

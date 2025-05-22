@@ -1,10 +1,28 @@
+import os
+
+from torch.utils.tensorboard import SummaryWriter
+
+
 def harmonic_mean(a, b):
     return 2 * (a * b) / (a + b)
 
+class CSVLogger:
+    def __init__(self, filename):
+        self.filename = filename
+        os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create folder if it doesn't exist
+        self.file = open(filename, "w")
+        self.file.write("epoch,base_acc,novel_acc,harmonic_mean\n")
+
+    def log(self, epoch, base_acc, novel_acc):
+        self.file.write(f"{epoch},{base_acc},{novel_acc},{harmonic_mean(base_acc, novel_acc)}\n")
+
+    def close(self):
+        self.file.close()
 
 class TensorboardLogger:
-    def __init__(self, writer):
+    def __init__(self, writer: SummaryWriter):
         self.writer = writer
+        self.csv_logger = CSVLogger(f"{writer.log_dir}/metrics.csv")
 
     def log_hparams(self, hparams: dict):
         self.writer.add_hparams(hparam_dict=hparams, metric_dict={})
@@ -38,6 +56,11 @@ class TensorboardLogger:
             "Base Accuracy": base_acc,
             "Novel Accuracy": novel_acc,
         }, global_step=step + 1)
+        self.csv_logger.log(step + 1, base_acc, novel_acc)
 
     def log_test_accuracy(self, step, acc, label):
         self.writer.add_scalar(f"{label}/accuracy", acc, step)
+
+    def close(self):
+        self.writer.close()
+        self.csv_logger.close()
