@@ -14,7 +14,9 @@ class CSVLogger:
         self.file.write("epoch,base_acc,novel_acc,harmonic_mean\n")
 
     def log(self, epoch, base_acc, novel_acc):
-        self.file.write(f"{epoch},{base_acc},{novel_acc},{harmonic_mean(base_acc, novel_acc)}\n")
+        hm = harmonic_mean(base_acc, novel_acc)
+        self.file.write(f"{epoch},{base_acc},{novel_acc},{hm}\n")
+        print(f"Logged: epoch {epoch}, base_acc {base_acc}, novel_acc {novel_acc}, harmonic_mean {hm}")
 
     def close(self):
         self.file.close()
