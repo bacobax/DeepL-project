@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     first_optimizer = EasyDict(prompt_lr=0.002, weight_decay=0.0005, momentum=0.9)  # for base training
     second_optimizer = EasyDict(prompt_lr=0.002, mlp_lr=0.004, weight_decay=0.0005, momentum=0.8)  # for adversarial training
-    mlp_opt = EasyDict(hidden_dim=256, hidden_layers=3)
+    mlp_opt = EasyDict(hidden_dim=592, hidden_layers=3)
     if use_coop:
         train_sys = CoOpSystem(
             batch_size=10,
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             batch_size=10,
             device=device,
-            epochs=0,
+            epochs=10,
             run_name=run_name,
             n_ctx=4,
             ctx_init="",
@@ -89,13 +89,13 @@ if __name__ == "__main__":
             lambda_adv=0.4,
             adv_training_epochs=10,
             cnn_model=CNN,
-            warmup_epoch=0,
+            warmup_epoch=2,
             warmup_cons_lr=1e-5,
             using_kl_adv=False,
             optimizer_configs=[first_optimizer, second_optimizer],
             grl_lambda=5,
             mlp_opt=mlp_opt,
-            skip_tests=[True, True, True]
+            skip_tests=[True, False, False]
         )
 
     train_sys.train()

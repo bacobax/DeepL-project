@@ -5,3 +5,4 @@ cifar10
 .qodo
 __pycache__
 .ipynb_checkpoints
+**/*.pth
