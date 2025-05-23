@@ -1,4 +1,4 @@
-from easydict import EasyDict
+import yaml
 import argparse
 
 from training_systems.cocoop import CoCoOpSystem
@@ -9,118 +9,66 @@ from datetime import datetime
 import pickle
 from collections import Counter
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default=os.getenv("DEVICE", "cuda:0"))
     parser.add_argument('--run_name', default=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    parser.add_argument('--using_coop', default=os.getenv("USING_COOP", "false").lower() in ("1", "true"), type=lambda x: x.lower() in ("1", "true", "yes", "true"))
+    parser.add_argument('--using_coop', default=False, type=lambda x: x.lower() in ("1", "true", "yes", "true"))
+    parser.add_argument('--config', default="train_config.yaml")
+    parser.add_argument('--debug', default=True, type=lambda x: x.lower() in ("1", "true", "yes", "true"))
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()
 
     device = args.device
     run_name = args.run_name
+    debug = args.debug
+    use_coop = args.using_coop
 
     print(f"Using device: {device}")
 
     if torch.backends.mps.is_available():
-        print("⚠️ Forcing float32 due to MPS limitations")
+        print("\u26a0\ufe0f Forcing float32 due to MPS limitations")
         torch.set_default_dtype(torch.float32)
-
-    use_coop = args.using_coop
 
     print(f"Using {'CoOp' if use_coop else 'CoCoOp'} for training")
 
-    # load the cluster labels from the file
-    CNN = "ViT-B/32"
+    # Load hyperparameters from YAML
+    with open(args.config, "r") as file:
+        config = yaml.safe_load(file)
 
-    CNN_SAFE = CNN.replace("/", "_")
+    cnn_model = config['cocoop']['cnn_model']
+    CNN_SAFE = cnn_model.replace("/", "_")
     N_CLUSTERS = 2
     VARIANCE = 0.95
-
-    file_path = (
-        f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl"
-    )
-
-    cls_cluster_dict = None
+    file_path = f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl"
 
     with open(file_path, "rb") as f:
         raw_dict = pickle.load(f)
         cls_cluster_dict = {int(k): v for k, v in raw_dict.items()}
-
-    print(Counter(cls_cluster_dict.values()))
-    # dictionary to map class names to cluster IDs
-    # cls_cluster_dict = {
-    #     "class1": 0,
-    #     "class2": 1,
-    #     "class3": 2,
-    #     # Add more classes and their corresponding cluster IDs
-    # }
+    if debug:
+        print("Cluster distribution:")
+        print(Counter(cls_cluster_dict.values()))
 
     if use_coop:
+        coop_cfg = config['coop']
         train_sys = CoOpSystem(
-            batch_size=10,
             device=device,
-            learning_rate=0.002,
-            weight_decay=0.0001,
-            momentum=0.9,
-            epochs=20,
             run_name=run_name,
-            n_ctx=8,
-            ctx_init="",
-            class_token_position="end",
-            csc=False,
+            **coop_cfg
         )
     else:
-
+        cocoop_cfg = config['cocoop']
+        cocoop_cfg['adv_training_opt']['cls_cluster_dict'] = cls_cluster_dict
         train_sys = CoCoOpSystem(
-            batch_size=10,
             device=device,
             run_name=run_name,
-            cnn_model=CNN,
-            optimizer_configs=[
-                EasyDict(
-                    prompt_lr=0.002,
-                    weight_decay=0.0001,
-                    momentum=0.9
-                ),
-                EasyDict(
-                    prompt_lr=0.002,
-                    mlp_lr=0.01,
-                    weight_decay=0.0005,
-                    momentum=0.8
-                )
-            ],
-            skip_tests=[True, False, False],
-            train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth",
-            # train_base_checkpoint_path=None,
-            debug=True,
-            prompt_learner_opt=EasyDict(
-                n_ctx=8,
-                ctx_init="",
-                class_token_position="end",
-                csc=False,
-            ),
-            kl_loss_opt=EasyDict(
-                lambda_kl=[0.1, 0.1],
-                using_kl_adv=False,
-            ),
-            adv_training_opt={
-                "adv_training_epochs": 2,
-                "lambda_adv": 0.5,
-                "grl_lambda": 5,
-                "mlp_opt": EasyDict({
-                    "hidden_dim": 592,
-                    "hidden_layers": 3,
-                }),
-                "cls_cluster_dict": cls_cluster_dict  # Keep as a regular dict
-            },
-            base_training_opt=EasyDict(
-                warmup_epoch=2,
-                warmup_cons_lr=1e-5,
-                epochs=10,
-            ),
+            cnn_model=cnn_model,
+            debug=debug,
+            **cocoop_cfg
         )
 
     train_sys.train()
