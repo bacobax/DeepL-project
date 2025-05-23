@@ -32,19 +32,19 @@ class BaseTestStep(EvaluationMethod):
             self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
     @torch.no_grad()
-    def evaluate(self, dataset, new_classnames=None, label="") -> Dict[str, float]:
+    def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         # Remap labels into a contiguous set starting from zero
-        self.walk(dataloader, accuracy_meter, label)
+        self.walk(dataloader, accuracy_meter, desc_add)
 
         return {"accuracy": accuracy_meter.avg}
 
     @torch.no_grad()
-    def walk(self, dataloader, accuracy_meter, label):
-        for image, target in tqdm(dataloader, desc="Test (Zero Shots) " + label):
+    def walk(self, dataloader, accuracy_meter, desc_add):
+        for image, target in tqdm(dataloader, desc="Test (Zero Shots) " + desc_add, position=1, leave=False):
             # base categories range from 0 to 50, while novel ones from 51 to 101
             # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
             # Map targets in contiguous set starting from zero
@@ -73,7 +73,7 @@ class FineTunedTestStep(EvaluationMethod):
     """
 
     @torch.no_grad()
-    def evaluate(self, dataset, new_classnames=None, label="") -> Dict[str, float]:
+    def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset)
@@ -81,7 +81,7 @@ class FineTunedTestStep(EvaluationMethod):
         new_classnames = [CLASS_NAMES[c] for c in new_classnames]
 
         with self.model.temporary_classnames(new_classnames):
-            for images, targets in tqdm(dataloader, desc="Test (FineTuned) " + label, position=1, leave=False):
+            for images, targets in tqdm(dataloader, desc="Test (FineTuned) " + desc_add, position=1, leave=False):
                 images = images.to(self.device)
                 targets = targets.to(self.device)
                 logits = self.model(images)

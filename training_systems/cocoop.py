@@ -483,22 +483,22 @@ class CoCoOpSystem:
         if base:
             base_metrics = self.zero_shot_base_classes_test_method.evaluate(
                 dataset=self.test_base,
-                label=" - Base Zerp Shot",
+                desc_add=" - Base Zerp Shot",
             )
             novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
                 dataset=self.test_novel,
-                label=" - Novel Zero Shot",
+                desc_add=" - Novel Zero Shot",
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
                 new_classnames=self.base_classes,
-                label=" - Base Fine Tuned",
+                desc_add=" - Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
                 new_classnames=self.novel_classes,
-                label=" - Novel Fine Tuned",
+                desc_add=" - Novel Fine Tuned",
             )
 
         base_accuracy = base_metrics["accuracy"]
