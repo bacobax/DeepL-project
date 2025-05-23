@@ -66,7 +66,6 @@ if __name__ == "__main__":
         train_sys = CoCoOpSystem(
             device=device,
             run_name=run_name,
-            cnn_model=cnn_model,
             debug=debug,
             **cocoop_cfg
         )

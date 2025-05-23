@@ -12,7 +12,7 @@ LOG_DIR=logs
 DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="NO_KL_ADV_IMG_FT_8_CTX"
-HPARAMS_CONF="test"
+HPARAMS_CONF="all_adv_training_8_ctx"
 DEBUG="true"
 
 RUN_NAME="${RUN_PREFIX}_$(date +"%Y%m%d_%H%M%S")"

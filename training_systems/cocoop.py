@@ -95,7 +95,7 @@ class CoCoOpSystem:
         self.train_base_checkpoint_path = train_base_checkpoint_path
         self.debug = debug
         self.max_epoch = self.epochs
-        self.optimizer_configs = optimizer_configs
+        self.optimizer_configs = [EasyDict(conf) for conf in optimizer_configs]
 
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.logger = TensorboardLogger(self.writer)
@@ -117,6 +117,9 @@ class CoCoOpSystem:
             "mlp_hidden_dim": self.mlp_opt.hidden_dim,
             "mlp_hidden_layers": self.mlp_opt.hidden_layers,
         })
+
+        print(self.skip_tests)
+        print(self.lambda_kl)
 
         # Load model
         self.clip_model, preprocess = clip.load(self.cnn_model)
