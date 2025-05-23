@@ -60,35 +60,35 @@ class CoCoOpSystem:
             base_training_opt=None,
     ):
         """
-            Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
+        Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
 
-            Args:
-                batch_size (int): Batch size for training.
-                device (str): Device identifier (e.g., 'cuda' or 'cpu').
-                run_name (str): Unique name for the training run.
-                cnn_model (str): Backbone CLIP model name.
-                optimizer_configs (list): Optimizer settings for base and adversarial training.
-                skip_tests (list): Booleans to skip testing after each training stage.
-                train_base_checkpoint_path (str): Optional path to a pre-trained base model.
-                debug (bool): Enables logging of additional debug information.
-                prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration namespaces.
-            """
+        Args:
+            batch_size (int): Batch size for training.
+            device (str): Device identifier (e.g., 'cuda' or 'cpu').
+            run_name (str): Unique name for the training run.
+            cnn_model (str): Backbone CLIP model name.
+            optimizer_configs (list): Optimizer settings for base and adversarial training.
+            skip_tests (list): Booleans to skip testing after each training stage.
+            train_base_checkpoint_path (str): Optional path to a pre-trained base model.
+            debug (bool): Enables logging of additional debug information.
+            prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration dictionaries.
+        """
         self.batch_size = batch_size
         self.device = device
-        self.epochs = base_training_opt.epochs
+        self.epochs = base_training_opt["epochs"]
         self.run_name = run_name
-        self.n_ctx = prompt_learner_opt.n_ctx
-        self.ctx_init = prompt_learner_opt.ctx_init
-        self.class_token_position = prompt_learner_opt.class_token_position
-        self.csc = prompt_learner_opt.csc
-        self.lambda_kl = kl_loss_opt.lambda_kl
+        self.n_ctx = prompt_learner_opt["n_ctx"]
+        self.ctx_init = prompt_learner_opt["ctx_init"]
+        self.class_token_position = prompt_learner_opt["class_token_position"]
+        self.csc = prompt_learner_opt["csc"]
+        self.lambda_kl = kl_loss_opt["lambda_kl"]
         self.cls_cluster_dict = adv_training_opt["cls_cluster_dict"]
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
-        self.warmup_epoch = base_training_opt.warmup_epoch
-        self.warmup_cons_lr = base_training_opt.warmup_cons_lr
-        self.using_kl_adv = kl_loss_opt.using_kl_adv
+        self.warmup_epoch = base_training_opt["warmup_epoch"]
+        self.warmup_cons_lr = base_training_opt["warmup_cons_lr"]
+        self.using_kl_adv = kl_loss_opt["using_kl_adv"]
         self.grl_lambda = adv_training_opt["grl_lambda"]
         self.mlp_opt = adv_training_opt["mlp_opt"]
         self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]

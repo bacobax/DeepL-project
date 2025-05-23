@@ -3,7 +3,6 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 import clip
-from torch.nn import functional as F
 
 from model.coop.custom_clip import CustomCLIPCoOp
 from utils.datasets import ContiguousLabelDataset, CLASS_NAMES

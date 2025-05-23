@@ -1,4 +1,4 @@
-import os
+"""import os
 import math
 
 import torch
@@ -8,13 +8,6 @@ from tqdm import tqdm
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import (
-    test_step,
-    training_step,
-    eval_step,
-    training_step_v2,
-    adversarial_training_step,
-)
 import clip
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import SGD, Adam, AdamW
@@ -74,3 +67,4 @@ if __name__ == "__main__":
     )
 
     print(f"Novel accuracy: {novel_accuracy}")
+"""
