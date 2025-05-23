@@ -90,7 +90,7 @@ class CoCoOpSystem:
         self.warmup_cons_lr = base_training_opt["warmup_cons_lr"]
         self.using_kl_adv = kl_loss_opt["using_kl_adv"]
         self.grl_lambda = adv_training_opt["grl_lambda"]
-        self.mlp_opt = adv_training_opt["mlp_opt"]
+        self.mlp_opt = EasyDict(adv_training_opt["mlp_opt"])
         self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]
         self.train_base_checkpoint_path = train_base_checkpoint_path
         self.debug = debug
