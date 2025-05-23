@@ -14,7 +14,7 @@ class EvalStep(EvaluationMethod):
     """
     Generic evaluation step for models that support temporary class name modification.
     """
-
+    @torch.no_grad()
     def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
         """
         Evaluate model performance on the provided dataset.
@@ -31,7 +31,7 @@ class EvalStep(EvaluationMethod):
         loss_meter = AverageMeter()
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset)
-        dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
 
         if new_classnames is not None:
             new_classnames = [CLASS_NAMES[c] for c in new_classnames]
@@ -42,6 +42,7 @@ class EvalStep(EvaluationMethod):
 
         return {"loss": loss_meter.avg, "accuracy": accuracy_meter.avg}
 
+    @torch.no_grad()
     def walk(self, loss_meter, accuracy_meter, dataloader, desc_add=""):
         """
         Perform the evaluation loop over the dataset.

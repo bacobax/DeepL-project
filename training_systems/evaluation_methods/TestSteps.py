@@ -44,7 +44,7 @@ class BaseTestStep(EvaluationMethod):
 
     @torch.no_grad()
     def walk(self, dataloader, accuracy_meter, label):
-        for image, target in tqdm(dataloader, desc=label):
+        for image, target in tqdm(dataloader, desc="Test (Zero Shots) " + label):
             # base categories range from 0 to 50, while novel ones from 51 to 101
             # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
             # Map targets in contiguous set starting from zero
@@ -81,7 +81,7 @@ class FineTunedTestStep(EvaluationMethod):
         new_classnames = [CLASS_NAMES[c] for c in new_classnames]
 
         with self.model.temporary_classnames(new_classnames):
-            for images, targets in tqdm(dataloader, desc="Evaluation (FineTuned) " + label, position=1, leave=False):
+            for images, targets in tqdm(dataloader, desc="Test (FineTuned) " + label, position=1, leave=False):
                 images = images.to(self.device)
                 targets = targets.to(self.device)
                 logits = self.model(images)

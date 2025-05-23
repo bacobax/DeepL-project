@@ -46,7 +46,8 @@ if __name__ == "__main__":
     cls_cluster_dict = None
 
     with open(file_path, "rb") as f:
-        cls_cluster_dict = pickle.load(f)
+        raw_dict = pickle.load(f)
+        cls_cluster_dict = {int(k): v for k, v in raw_dict.items()}
 
     print(Counter(cls_cluster_dict.values()))
     # dictionary to map class names to cluster IDs
@@ -91,7 +92,7 @@ if __name__ == "__main__":
                     momentum=0.8
                 )
             ],
-            skip_tests=[True, True, True],
+            skip_tests=[True, False, False],
             train_base_checkpoint_path="./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth",
             # train_base_checkpoint_path=None,
             debug=True,
@@ -105,16 +106,16 @@ if __name__ == "__main__":
                 lambda_kl=[0.1, 0.1],
                 using_kl_adv=False,
             ),
-            adv_training_opt=EasyDict(
-                adv_training_epochs=10,
-                cls_cluster_dict=cls_cluster_dict,
-                lambda_adv=0.5,
-                grl_lambda=5,
-                mlp_opt=EasyDict(
-                    hidden_dim=592,
-                    hidden_layers=3
-                ),
-            ),
+            adv_training_opt={
+                "adv_training_epochs": 2,
+                "lambda_adv": 0.5,
+                "grl_lambda": 5,
+                "mlp_opt": EasyDict({
+                    "hidden_dim": 592,
+                    "hidden_layers": 3,
+                }),
+                "cls_cluster_dict": cls_cluster_dict  # Keep as a regular dict
+            },
             base_training_opt=EasyDict(
                 warmup_epoch=2,
                 warmup_cons_lr=1e-5,

@@ -82,15 +82,15 @@ class CoCoOpSystem:
         self.class_token_position = prompt_learner_opt.class_token_position
         self.csc = prompt_learner_opt.csc
         self.lambda_kl = kl_loss_opt.lambda_kl
-        self.cls_cluster_dict = adv_training_opt.cls_cluster_dict
-        self.lambda_adv = adv_training_opt.lambda_adv
-        self.adv_training_epochs = adv_training_opt.adv_training_epochs
+        self.cls_cluster_dict = adv_training_opt["cls_cluster_dict"]
+        self.lambda_adv = adv_training_opt["lambda_adv"]
+        self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
         self.warmup_epoch = base_training_opt.warmup_epoch
         self.warmup_cons_lr = base_training_opt.warmup_cons_lr
         self.using_kl_adv = kl_loss_opt.using_kl_adv
-        self.grl_lambda = adv_training_opt.grl_lambda
-        self.mlp_opt = adv_training_opt.mlp_opt
+        self.grl_lambda = adv_training_opt["grl_lambda"]
+        self.mlp_opt = adv_training_opt["mlp_opt"]
         self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]
         self.train_base_checkpoint_path = train_base_checkpoint_path
         self.debug = debug
@@ -492,6 +492,7 @@ class CoCoOpSystem:
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
+                new_classnames=self.base_classes,
                 label=" - Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
