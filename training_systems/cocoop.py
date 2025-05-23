@@ -1,3 +1,7 @@
+"""
+Main module for training the CoCoOp system, supporting both base and adversarial training phases.
+Includes configuration, data loading, model preparation, and training logic for zero-shot learning with CLIP.
+"""
 import os
 import math
 from copy import deepcopy
@@ -13,25 +17,32 @@ import clip
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-from utils.training_cocoop import (
-    test_step,
-    eval_step,
-)
 import hashlib
 
 from utils.tensor_board_logger import TensorboardLogger
 from training_systems.training_methods import TrainingMethod, Adversarial, KLAdversarial, KLCoCoOp
+from training_systems.evaluation_methods import BaseTestStep, FineTunedTestStep, EvalStep
 
 def checksum(model):
+    """
+    Generate an MD5 checksum of the model's parameters to track changes across training.
+
+    Args:
+        model (torch.nn.Module): The model to hash.
+
+    Returns:
+        str: MD5 hash string.
+    """
     with torch.no_grad():
         all_params = torch.cat([p.view(-1).cpu() for p in model.parameters() if p.requires_grad])
         return hashlib.md5(all_params.numpy().tobytes()).hexdigest()
 
-def harmonic_mean(a, b):
-    return 2 * (a * b) / (a + b)
-
 
 class CoCoOpSystem:
+    """
+    Manages the full training process of the CoCoOp model, including configuration, training, evaluation,
+    checkpointing, and logging. Supports both base and adversarial training.
+    """
     def __init__(
             self,
             *,
@@ -48,6 +59,20 @@ class CoCoOpSystem:
             adv_training_opt=None,
             base_training_opt=None,
     ):
+        """
+            Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
+
+            Args:
+                batch_size (int): Batch size for training.
+                device (str): Device identifier (e.g., 'cuda' or 'cpu').
+                run_name (str): Unique name for the training run.
+                cnn_model (str): Backbone CLIP model name.
+                optimizer_configs (list): Optimizer settings for base and adversarial training.
+                skip_tests (list): Booleans to skip testing after each training stage.
+                train_base_checkpoint_path (str): Optional path to a pre-trained base model.
+                debug (bool): Enables logging of additional debug information.
+                prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration namespaces.
+            """
         self.batch_size = batch_size
         self.device = device
         self.epochs = base_training_opt.epochs
@@ -136,6 +161,35 @@ class CoCoOpSystem:
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
+        self._set_train_methods()
+
+        self._set_eval_method()
+
+        self._set_test_methods()
+
+    def _set_test_methods(self):
+        self.zero_shot_base_classes_test_method = BaseTestStep(
+            model=self.clip_model,
+            batch_size=self.batch_size,
+            categories=self.base_classes,
+        )
+        self.zero_shot_novel_classes_test_method = BaseTestStep(
+            model=self.clip_model,
+            batch_size=self.batch_size,
+            categories=self.novel_classes,
+        )
+        self.finetuned_test_method = FineTunedTestStep(
+            model=self.model,
+            batch_size=self.batch_size,
+        )
+
+    def _set_eval_method(self):
+        self.eval_method = EvalStep(
+            model=self.model,
+            batch_size=self.batch_size,
+        )
+
+    def _set_train_methods(self):
         self.adversarial_method = Adversarial(
             lambda_adv=0.05,
             model=self.model,
@@ -154,7 +208,6 @@ class CoCoOpSystem:
             lambda_kl=self.lambda_kl[1],
             debug=self.debug,
         )
-
         self.basic_train_method = KLCoCoOp(
             model=self.model,
             optimizer=self.optimizer,
@@ -163,7 +216,9 @@ class CoCoOpSystem:
         )
 
     def train(self):
-
+        """
+        Execute the full training pipeline: base phase, optionally followed by adversarial training and evaluation.
+        """
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         if self.train_base_checkpoint_path is None:
             # Base training phase
@@ -208,6 +263,15 @@ class CoCoOpSystem:
         self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
 
     def _train_base_phase(self, best_model_path):
+        """
+        Train the model using KL regularization only (no adversarial objective).
+
+        Args:
+            best_model_path (str): Path to store the best base model.
+
+        Returns:
+            Tuple[int, float]: Final epoch index and best validation accuracy on novel classes.
+        """
         best_novel_accuracy = 0.0
         patience = 4
         patience_counter = 0
@@ -256,6 +320,16 @@ class CoCoOpSystem:
         return c, best_novel_accuracy
 
     def _train_adversarial_phase(self, start_epoch, best_model_path):
+        """
+        Train the model adversarially with dynamic lambda scheduling and early stopping.
+
+        Args:
+            start_epoch (int): Starting epoch index.
+            best_model_path (str): Path to save the best adversarial model.
+
+        Returns:
+            int: Final epoch index after training.
+        """
         best_novel_accuracy = 0.0
         patience = 5
         patience_counter = 0
@@ -337,49 +411,124 @@ class CoCoOpSystem:
         return start_epoch + self.adv_training_epochs
 
     def _evaluate_and_log(self, epoch, is_adv=False):
-        base_val_loss, base_val_acc = eval_step(
-            model=self.model,
+        """
+        Run validation and log results for both base and novel splits.
+
+        Args:
+            epoch (int): Current training epoch.
+            is_adv (bool): Whether evaluation is during adversarial training.
+
+        Returns:
+            Tuple[float, float]: Accuracy for base and novel classes.
+        """
+        metrics_base = self.eval_method.evaluate(
             dataset=self.val_base,
-            cost_function=self.cost_function,
-            device=self.device,
-            batch_size=self.batch_size,
             desc_add=" - Base",
         )
-        novel_val_loss, novel_val_acc = eval_step(
-            model=self.model,
+        base_val_loss = metrics_base["loss"]
+        base_val_acc = metrics_base["accuracy"]
+
+        metrics_novel = self.eval_method.evaluate(
             dataset=self.val_novel,
-            cost_function=self.cost_function,
-            device=self.device,
-            batch_size=self.batch_size,
             new_classnames=self.novel_classes,
             desc_add=" - Novel"
         )
+        novel_val_loss = metrics_novel["loss"]
+        novel_val_acc = metrics_novel["accuracy"]
 
         self.logger.log_validation(epoch, base_val_loss, base_val_acc, novel_val_loss, novel_val_acc, is_adv=is_adv)
 
         return base_val_acc, novel_val_acc
 
     def _log_final_metrics(self, tag, base_acc, novel_acc, step):
+        """
+        Log final test results to TensorBoard.
+
+        Args:
+            tag (str): Descriptive tag for the log.
+            base_acc (float): Accuracy on base classes.
+            novel_acc (float): Accuracy on novel classes.
+            step (int): Epoch or step index for this log.
+        """
         self.logger.log_final_metrics(tag, base_acc, novel_acc, step)
 
     def _lr_lambda(self, current_epoch):
+        """
+        Learning rate scheduler with cosine annealing and warm-up.
+
+        Args:
+            current_epoch (int): Epoch index.
+
+        Returns:
+            float: Learning rate multiplier.
+        """
         if current_epoch < self.warmup_epoch:
             return self.warmup_cons_lr / self.optimizer_configs[0].prompt_lr
         return 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch + 1e-7)))
 
     def compute_evaluation(self, epoch_idx, base=False):
+        """
+        Run evaluation on the test split for both base and novel classes.
+
+        Args:
+            epoch_idx (int): Epoch index for logging.
+            base (bool): Whether to evaluate the frozen base CLIP model.
+
+        Returns:
+            Tuple[float, float]: Base and novel class test accuracy.
+
         model = self.model if not base else self.clip_model
         base_accuracy = test_step(model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
-        novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
+        novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)"""
+        if base:
+            base_metrics = self.zero_shot_base_classes_test_method.evaluate(
+                dataset=self.test_base,
+                label=" - Base Zerp Shot",
+            )
+            novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
+                dataset=self.test_novel,
+                label=" - Novel Zero Shot",
+            )
+        else:
+            base_metrics = self.finetuned_test_method.evaluate(
+                dataset=self.test_base,
+                label=" - Base Fine Tuned",
+            )
+            novel_metrics = self.finetuned_test_method.evaluate(
+                dataset=self.test_novel,
+                new_classnames=self.novel_classes,
+                label=" - Novel Fine Tuned",
+            )
+
+        base_accuracy = base_metrics["accuracy"]
+        novel_accuracy = novel_metrics["accuracy"]
         self.logger.log_test_accuracy(epoch_idx, base_accuracy, "base_classes")
         self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "novel_classes")
         return base_accuracy, novel_accuracy
 
     def save_model(self, path="./bin/cocoop", prefix=""):
+        """
+        Save model weights to disk.
+
+        Args:
+            path (str): Directory to save the model to.
+            prefix (str): Filename prefix to distinguish models.
+        """
         os.makedirs(path, exist_ok=True)
         torch.save(self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth"))
 
     def get_optimizer(self, model, mlp_adversary, config):
+        """
+        Build an SGD optimizer with separate learning rates for different parameter groups.
+
+        Args:
+            model (torch.nn.Module): Main model.
+            mlp_adversary (torch.nn.Module): Optional adversarial MLP.
+            config: Optimizer configuration namespace.
+
+        Returns:
+            torch.optim.Optimizer: Configured optimizer.
+        """
         params = [
             {
                 "params": [p for n, p in model.named_parameters() if "prompt_learner" in n and p.requires_grad],

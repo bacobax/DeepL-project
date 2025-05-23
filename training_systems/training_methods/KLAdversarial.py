@@ -9,7 +9,7 @@ from training_systems.training_methods.TrainingMethod import TrainingMethod
 
 from utils.metrics import AverageMeter
 from utils.datasets import ContiguousLabelDataset
-from utils.training_cocoop import get_kl_loss
+from utils.kl import get_kl_loss
 
 from model.cocoop.mlp_adversary import AdversarialMLP, GradientReversalLayer
 

@@ -15,8 +15,27 @@ from utils.datasets import ContiguousLabelDataset
 class TrainingMethod(ABC):
     """
     Abstract base class for training methods. it should have forward_backward method to be fulfilled by its children
+
+    The TrainingMethod class serves as an abstract interface that standardizes the structure of different training strategies.
+    It defines key methods that all training strategies must implement, such as:
+     - `get_metrics`: to initialize and return the performance metrics.
+     - `get_data_loader`: to prepare the DataLoader tailored for the specific training strategy.
+     - `forward_backward`: to implement the forward and backward passes during training.
+     - `debug_metrics_to_pbar_args`: to convert debug information for progress bar visualization.
+     - `training_step_return`: to return summary metrics after a training epoch.
+     It also provides common functionality like `start_training`, `optimizer_step`, and `train_step` to be reused across concrete training methods.
     """
+
     def __init__(self, model: Any, optimizer: Any, title: str, debug) -> None:
+        """
+        Initialize the training method.
+
+        Args:
+            model (Any): The model to train.
+            optimizer (Any): The optimizer to use for training.
+            title (str): Title for identification (e.g., for progress display).
+            debug (bool): Flag to enable debug mode for extra logging.
+        """
         self.model = model
         self.optimizer = optimizer
         self.title = title
@@ -26,60 +45,94 @@ class TrainingMethod(ABC):
     @abstractmethod
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
-        Get the metrics for the training method.
+        Initialize and return a dictionary of performance metrics.
+
+        Returns:
+            Dict[str, AverageMeter]: Dictionary mapping metric names to metric trackers.
         """
         pass
 
     @abstractmethod
     def get_data_loader(self, dataset, batch_size) -> DataLoader:
         """
-        Get the data loader for the training method.
+        Create a data loader for the training dataset.
+
+        Args:
+            dataset: The training dataset.
+            batch_size (int): Number of samples per batch.
+
+        Returns:
+            DataLoader: PyTorch data loader instance.
         """
         pass
 
     @abstractmethod
-    def forward_backward(self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset) -> Dict[str, float]:
+    def forward_backward(
+            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset
+    ) -> Dict[str, float]:
         """
-        Forward and backward pass for the training method.
+        Execute forward and backward pass, compute loss, and update metrics.
+
+        Args:
+            sample: Current batch sample from data loader.
+            batch_idx (int): Index of the current batch.
+            metrics (Dict[str, AverageMeter]): Metric trackers.
+            dataset (ContiguousLabelDataset): Dataset wrapper for label mapping.
+
+        Returns:
+            Dict[str, float]: Dictionary of current debug metric values.
         """
         pass
 
     @abstractmethod
     def debug_metrics_to_pbar_args(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
         """
-        Convert debug metrics to pbar args.
+        Format debug metrics for display in a progress bar.
+
+        Args:
+            debug_metrics (Dict[str, float]): Metrics from the current step.
+
+        Returns:
+            Dict[str, float]: Formatted metrics for tqdm display.
         """
         pass
-
-
 
     @abstractmethod
     def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
         """
-        Return the training step metrics.
+        Generate summary metrics after completing a training epoch.
+
+        Args:
+            metrics (Dict[str, AverageMeter]): Collected training metrics.
+
+        Returns:
+            List[float]: List of averaged metric values for reporting.
         """
-        pass
-
-
 
     def optimizer_step(self) -> None:
         """
-        Perform an optimizer step.
+        Apply the optimizer's step and zero the gradients.
         """
         self.optimizer.step()
         self.optimizer.zero_grad()
 
     def start_training(self) -> None:
         """
-        Start training.
+        Set the model in training mode.
         """
         self.model.train()
 
-    def train_step(
-            self,
-            dataset,
-            batch_size,
-    ):
+    def train_step(self, dataset, batch_size):
+        """
+        Perform a complete training epoch, including data loading, training, and metric collection.
+
+        Args:
+            dataset: Dataset used for training.
+            batch_size (int): Number of samples per training batch.
+
+        Returns:
+            List[float]: Averaged values for each tracked metric after the epoch.
+        """
         metrics = self.get_metrics()
         self.start_training()
         tmp_dataset = ContiguousLabelDataset(dataset)

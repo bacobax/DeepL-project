@@ -162,4 +162,3 @@ class Adversarial(TrainingMethod):
         Update the lambda_adv parameter.
         """
         self.lambda_adv = lambda_adv
-
