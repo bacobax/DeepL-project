@@ -41,3 +41,8 @@ cocoop:
     warmup_epoch: 2
     warmup_cons_lr: 0.00001
     epochs: 10
+  clustering_opt:
+    n_clusters: 2
+    variance: 0.95
+    vision_encoder: "ViT-B/32"
+    method: "kmeans"
