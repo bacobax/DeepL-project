@@ -22,7 +22,7 @@ import hashlib
 from utils.tensor_board_logger import TensorboardLogger
 from training_systems.training_methods import TrainingMethod, Adversarial, KLAdversarial, KLCoCoOp
 from training_systems.evaluation_methods import BaseTestStep, FineTunedTestStep, EvalStep
-
+from utils.clustering import conditional_clustering
 def checksum(model):
     """
     Generate an MD5 checksum of the model's parameters to track changes across training.
@@ -58,6 +58,7 @@ class CoCoOpSystem:
             kl_loss_opt=None,
             adv_training_opt=None,
             base_training_opt=None,
+            clustering_opt=None,
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -82,7 +83,6 @@ class CoCoOpSystem:
         self.class_token_position = prompt_learner_opt["class_token_position"]
         self.csc = prompt_learner_opt["csc"]
         self.lambda_kl = kl_loss_opt["lambda_kl"]
-        self.cls_cluster_dict = adv_training_opt["cls_cluster_dict"]
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
@@ -130,6 +130,17 @@ class CoCoOpSystem:
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
+
+        # Load clustering information
+        self.cls_cluster_dict, _ = conditional_clustering(
+            n_cluster=clustering_opt["n_clusters"],
+            variance=clustering_opt["variance"],
+            cnn_safe=clustering_opt["vision_encoder"].replace("/", "_"),
+            c_m=self.clip_model,
+            device=self.device,
+            classes=self.base_classes,
+            dataset=self.train_base,
+        )
 
         resolution = self.clip_model.visual.input_resolution
         ctx_load = "./bin/coop/exp1_ctx_only.pth" if self.n_ctx == 4 else "./bin/coop/coop_ctx_8.pth"

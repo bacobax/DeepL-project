@@ -44,7 +44,8 @@ if __name__ == "__main__":
     CNN_SAFE = cnn_model.replace("/", "_")
     N_CLUSTERS = 2
     VARIANCE = 0.95
-    file_path = f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl"
+    folder = f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}"
+    file_path = os.path.join(folder, "int_categories.pkl")
 
     with open(file_path, "rb") as f:
         raw_dict = pickle.load(f)
