@@ -46,7 +46,7 @@ class CoCoOpSystem:
     def __init__(
             self,
             *,
-            batch_size=16,
+            test_batch_size=16,
             device="cuda",
             run_name="exp1",
             cnn_model="ViT-B/32",
@@ -82,7 +82,7 @@ class CoCoOpSystem:
         assert clustering_opt is not None, "clustering_opt must be provided"
         assert optimizer_configs is not None and len(optimizer_configs) == 2, "Two optimizer configs must be provided"
 
-        self.batch_size = batch_size
+        self.test_batch_size = test_batch_size
         self.device = device
         self.epochs = base_training_opt["epochs"]
         self.run_name = run_name
@@ -105,13 +105,19 @@ class CoCoOpSystem:
         self.max_epoch = self.epochs
         self.optimizer_configs = [EasyDict(conf) for conf in optimizer_configs]
         self.warmup_lambda_adv = adv_training_opt["warmup_lambda_adv"]
+        self.base_batch_size = base_training_opt["batch_size"]
+        self.adv_batch_size = adv_training_opt["batch_size"]
 
+        print("BATCH SIZES: ", self.test_batch_size, self.base_batch_size, self.adv_batch_size)
+        
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
 
         self.logger.log_hparams({
-            "batch_size": self.batch_size,
+            "batch_size_test": self.test_batch_size,
+            "base_batch_size": self.base_batch_size,
+            "adv_batch_size": self.adv_batch_size,
             "epochs": self.epochs,
             "n_ctx": self.n_ctx,
             "ctx_init": self.ctx_init,
@@ -191,23 +197,23 @@ class CoCoOpSystem:
     def _set_test_methods(self):
         self.zero_shot_base_classes_test_method = BaseTestStep(
             model=self.clip_model,
-            batch_size=self.batch_size,
+            batch_size=self.test_batch_size,
             categories=self.base_classes,
         )
         self.zero_shot_novel_classes_test_method = BaseTestStep(
             model=self.clip_model,
-            batch_size=self.batch_size,
+            batch_size=self.test_batch_size,
             categories=self.novel_classes,
         )
         self.finetuned_test_method = FineTunedTestStep(
             model=self.model,
-            batch_size=self.batch_size,
+            batch_size=self.test_batch_size,
         )
 
     def _set_eval_method(self):
         self.eval_method = EvalStep(
             model=self.model,
-            batch_size=self.batch_size,
+            batch_size=self.test_batch_size,
         )
 
     def _set_train_methods(self):
@@ -305,7 +311,7 @@ class CoCoOpSystem:
 
             total_loss, acc, ce_loss, kl_loss = method.train_step(
                 self.train_base,
-                self.batch_size,
+                self.base_batch_size,
             )
 
             self.logger.log_training_base(
@@ -373,12 +379,12 @@ class CoCoOpSystem:
             if self.using_kl_adv:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
                     self.train_base,
-                    self.batch_size,
+                    self.base_batch_size,
                 )
             else:
                 total_loss, acc, ce_loss, adv_loss = method.train_step(
                     self.train_base,
-                    self.batch_size,
+                    self.adv_batch_size,
                 )
                 kl_loss = None
 

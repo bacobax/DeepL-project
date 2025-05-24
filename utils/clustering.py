@@ -74,7 +74,8 @@ def cluster_categories(
 
 
 def conditional_clustering(n_cluster, variance, cnn, device):
-    save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn}"
+    cnn_sanitized = cnn.replace("/", "_")
+    save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn_sanitized}"
     os.makedirs(save_dir, exist_ok=True)
 
     int_categories_path = os.path.join(save_dir, "int_categories.pkl")
@@ -92,7 +93,7 @@ def conditional_clustering(n_cluster, variance, cnn, device):
         print("🟧 NO CLUSTERS FILES FOUND. Loading existing cluster labels...")
         # cluster the base classes
         cluster_labels, cluster_labels_text = cluster_categories(
-            device, n_clusters=n_cluster, variance=variance, cnn=cnn.replace("/", "_")
+            device, n_clusters=n_cluster, variance=variance, cnn=cnn
         )
         cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
         with open(int_categories_path, "wb") as f:
