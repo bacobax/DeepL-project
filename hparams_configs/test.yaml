@@ -31,6 +31,7 @@ cocoop:
     lambda_kl: [0.1, 0.1]
     using_kl_adv: false
   adv_training_opt:
+    warmup_lambda_adv: 6
     adv_training_epochs: 2
     lambda_adv: 0.5
     grl_lambda: 5

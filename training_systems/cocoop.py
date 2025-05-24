@@ -104,6 +104,7 @@ class CoCoOpSystem:
         self.debug = debug
         self.max_epoch = self.epochs
         self.optimizer_configs = [EasyDict(conf) for conf in optimizer_configs]
+        self.warmup_lambda_adv = adv_training_opt["warmup_lambda_adv"]
 
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.writer.add_text("Hparams yaml file", hparams_file)
@@ -354,7 +355,7 @@ class CoCoOpSystem:
         patience = 5
         patience_counter = 0
         at_least_one_improving = False
-        warmup_epochs = max(1, int(0.2 * self.adv_training_epochs))
+        warmup_epochs = self.warmup_lambda_adv
         lambda_adv_max = self.lambda_adv
         initial_lambda_adv = 0.05
         pbar = tqdm(total=self.adv_training_epochs, desc="Adversarial Training")
