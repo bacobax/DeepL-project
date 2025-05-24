@@ -53,6 +53,7 @@ if __name__ == "__main__":
             device=device,
             run_name=run_name,
             debug=debug,
+            hparams_file=args.config,
             **cocoop_cfg
         )
 

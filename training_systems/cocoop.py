@@ -50,6 +50,7 @@ class CoCoOpSystem:
             device="cuda",
             run_name="exp1",
             cnn_model="ViT-B/32",
+            hparams_file,
             optimizer_configs=None,
             skip_tests=None,
             train_base_checkpoint_path=None,
@@ -105,6 +106,7 @@ class CoCoOpSystem:
         self.optimizer_configs = [EasyDict(conf) for conf in optimizer_configs]
 
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
+        self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
 
         self.logger.log_hparams({
