@@ -74,6 +74,13 @@ class CoCoOpSystem:
             debug (bool): Enables logging of additional debug information.
             prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration dictionaries.
         """
+        assert prompt_learner_opt is not None, "prompt_learner_opt must be provided"
+        assert kl_loss_opt is not None, "kl_loss_opt must be provided"
+        assert adv_training_opt is not None, "adv_training_opt must be provided"
+        assert base_training_opt is not None, "base_training_opt must be provided"
+        assert clustering_opt is not None, "clustering_opt must be provided"
+        assert optimizer_configs is not None and len(optimizer_configs) == 2, "Two optimizer configs must be provided"
+
         self.batch_size = batch_size
         self.device = device
         self.epochs = base_training_opt["epochs"]
