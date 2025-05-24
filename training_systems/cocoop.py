@@ -144,11 +144,8 @@ class CoCoOpSystem:
         self.cls_cluster_dict, _ = conditional_clustering(
             n_cluster=clustering_opt["n_clusters"],
             variance=clustering_opt["variance"],
-            cnn_safe=clustering_opt["vision_encoder"].replace("/", "_"),
-            c_m=self.clip_model,
+            cnn=clustering_opt["vision_encoder"],
             device=self.device,
-            classes=self.base_classes,
-            dataset=self.train_base,
         )
 
         resolution = self.clip_model.visual.input_resolution

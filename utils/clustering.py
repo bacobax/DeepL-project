@@ -12,8 +12,21 @@ from sklearn.metrics.pairwise import cosine_distances
 
 
 def cluster_categories(
-    clip_model, base_classes, train_base, device, n_clusters=2, variance=0.95
+     device, cnn, n_clusters=2, variance=0.95
 ):
+
+    # initialize clip model with ViT
+    clip_model, preprocess = clip.load(cnn)
+    clip_model = clip_model.to(device)
+
+    train_set, _, _ = get_data(data_dir="../data", transform=preprocess)
+
+    # split classes into base and novel
+    base_classes, _ = base_novel_categories(train_set)
+
+    # split the three datasets
+    train_base, _ = split_data(train_set, base_classes)
+
     class_feature = {}
     with torch.no_grad():
         for c in tqdm(base_classes, desc="Processing classes"):
@@ -55,11 +68,13 @@ def cluster_categories(
         for base_class, cluster in enumerate(cluster_labels)
     }
 
+    torch.cuda.empty_cache()
+
     return cluster_labels, cluster_labels_text
 
 
-def conditional_clustering(n_cluster, variance, cnn_safe, c_m, classes, dataset, device):
-    save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn_safe}"
+def conditional_clustering(n_cluster, variance, cnn, device):
+    save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn}"
     os.makedirs(save_dir, exist_ok=True)
 
     int_categories_path = os.path.join(save_dir, "int_categories.pkl")
@@ -77,7 +92,7 @@ def conditional_clustering(n_cluster, variance, cnn_safe, c_m, classes, dataset,
         print("🟧 NO CLUSTERS FILES FOUND. Loading existing cluster labels...")
         # cluster the base classes
         cluster_labels, cluster_labels_text = cluster_categories(
-            c_m, classes, dataset, device, n_clusters=n_cluster, variance=variance
+            device, n_clusters=n_cluster, variance=variance, cnn=cnn.replace("/", "_")
         )
         cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
         with open(int_categories_path, "wb") as f:
@@ -102,20 +117,8 @@ if __name__ == "__main__":
         else "mps" if torch.backends.mps.is_available() else "cpu"
     )
 
-    CNN_SAFE = CNN.replace("/", "_")
-    # initialize clip model with ViT
-    clip_model, preprocess = clip.load(CNN)
-    clip_model = clip_model.to(DEVICE)
-
-    train_set, _, _ = get_data(data_dir="../data", transform=preprocess)
-
-    # split classes into base and novel
-    base_classes, _ = base_novel_categories(train_set)
-
-    # split the three datasets
-    train_base, _ = split_data(train_set, base_classes)
 
     cls_cluster_dict_int, cluster_labels_text = conditional_clustering(
-        N_CLUSTERS, VARIANCE, CNN_SAFE, clip_model, base_classes, train_base, DEVICE
+        N_CLUSTERS, VARIANCE, CNN, DEVICE
     )
     print(cls_cluster_dict_int, cluster_labels_text)
