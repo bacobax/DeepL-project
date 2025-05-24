@@ -7,6 +7,8 @@ from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NA
 import clip
 import os
 import pickle
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics.pairwise import cosine_distances
 
 
 def cluster_categories(
@@ -37,8 +39,14 @@ def cluster_categories(
 
     print(f"Reduced feature shape: {X_reduced.shape}, Variance explained: {pca.explained_variance_ratio_.sum()}")
 
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(X_reduced)  # shape: [n_base_classes x 1]
+    cosine_dist = cosine_distances(X_reduced)
+    # Step 5: Agglomerative clustering
+    agglo = AgglomerativeClustering(
+        n_clusters=n_clusters,
+        metric='precomputed',
+        linkage='average'
+    )
+    cluster_labels = agglo.fit_predict(cosine_dist)
 
     cluster_labels = {idx2cat[i]: cluster for i, cluster in enumerate(cluster_labels)}
 
@@ -58,7 +66,7 @@ def conditional_clustering(n_cluster, variance, cnn_safe, c_m, classes, dataset,
     text_categories_path = os.path.join(save_dir, "text_categories.pkl")
 
     if os.path.exists(int_categories_path) and os.path.exists(text_categories_path):
-        print("Loading existing cluster labels...")
+        print("🟩 CLUSTERS FILES FOUND. Loading existing cluster labels...")
         with open(int_categories_path, "rb") as f:
             cluster_labels = pickle.load(f)
             cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
@@ -66,12 +74,12 @@ def conditional_clustering(n_cluster, variance, cnn_safe, c_m, classes, dataset,
             cluster_labels_text = pickle.load(f)
 
     else:
-        print("Clustering base classes...")
+        print("🟧 NO CLUSTERS FILES FOUND. Loading existing cluster labels...")
         # cluster the base classes
         cluster_labels, cluster_labels_text = cluster_categories(
             c_m, classes, dataset, device, n_clusters=n_cluster, variance=variance
         )
-
+        cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
         with open(int_categories_path, "wb") as f:
             pickle.dump(cluster_labels, f)
         with open(text_categories_path, "wb") as f:

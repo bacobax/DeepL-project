@@ -40,19 +40,6 @@ if __name__ == "__main__":
     with open(args.config, "r") as file:
         config = yaml.safe_load(file)
 
-    cnn_model = config['cocoop']['cnn_model']
-    CNN_SAFE = cnn_model.replace("/", "_")
-    N_CLUSTERS = 2
-    VARIANCE = 0.95
-    file_path = f"clustering_split/cluster_labels_{N_CLUSTERS}_{VARIANCE}_{CNN_SAFE}.pkl"
-
-    with open(file_path, "rb") as f:
-        raw_dict = pickle.load(f)
-        cls_cluster_dict = {int(k): v for k, v in raw_dict.items()}
-    if debug:
-        print("Cluster distribution:")
-        print(Counter(cls_cluster_dict.values()))
-
     if use_coop:
         coop_cfg = config['coop']
         train_sys = CoOpSystem(
@@ -62,7 +49,6 @@ if __name__ == "__main__":
         )
     else:
         cocoop_cfg = config['cocoop']
-        cocoop_cfg['adv_training_opt']['cls_cluster_dict'] = cls_cluster_dict
         train_sys = CoCoOpSystem(
             device=device,
             run_name=run_name,
