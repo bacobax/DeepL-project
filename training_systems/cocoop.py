@@ -365,7 +365,7 @@ class CoCoOpSystem:
 
         for e in range(start_epoch, start_epoch + self.adv_training_epochs):
             progress = (e - start_epoch + 1) / warmup_epochs
-            new_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * 0.5 * (1 - math.cos(math.pi * min(progress, 1)))
+            new_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * min(progress, 1)
 
             method.update_lambda_adv(new_lambda_adv)
 

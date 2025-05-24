@@ -38,7 +38,7 @@ cocoop:
       hidden_dim: 592
       hidden_layers: 3
   base_training_opt:
-    warmup_epoch: 0
+    warmup_epoch: 2
     warmup_cons_lr: 0.00001
     epochs: 0
   clustering_opt:
