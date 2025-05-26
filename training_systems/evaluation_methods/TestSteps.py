@@ -11,7 +11,7 @@ from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 from utils.metrics import AverageMeter
 
 
-class BaseTestStep(EvaluationMethod):
+class ZeroShotTestStep(EvaluationMethod):
     """
     Evaluation method for models that have been fine-tuned (e.g., CoCoOp or adversarial models).
     """

@@ -20,8 +20,8 @@ from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NA
 import hashlib
 
 from utils.tensor_board_logger import TensorboardLogger
-from training_systems.training_methods import TrainingMethod, Adversarial, KLAdversarial, KLCoCoOp
-from training_systems.evaluation_methods import BaseTestStep, FineTunedTestStep, EvalStep
+from training_systems.training_methods import Adversarial, KLAdversarial, KLCoCoOp, BaseCoCoOp
+from training_systems.evaluation_methods import ZeroShotTestStep, FineTunedTestStep, EvalStep
 from utils.clustering import conditional_clustering
 def checksum(model):
     """
@@ -96,7 +96,7 @@ class CoCoOpSystem:
         self.cnn_model = cnn_model
         self.warmup_epoch = base_training_opt["warmup_epoch"]
         self.warmup_cons_lr = base_training_opt["warmup_cons_lr"]
-        self.using_kl_adv = kl_loss_opt["using_kl_adv"]
+        self.using_kl = kl_loss_opt["using_kl"]
         self.grl_lambda = adv_training_opt["grl_lambda"]
         self.mlp_opt = EasyDict(adv_training_opt["mlp_opt"])
         self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]
@@ -195,12 +195,12 @@ class CoCoOpSystem:
         self._set_test_methods()
 
     def _set_test_methods(self):
-        self.zero_shot_base_classes_test_method = BaseTestStep(
+        self.zero_shot_base_classes_test_method = ZeroShotTestStep(
             model=self.clip_model,
             batch_size=self.test_batch_size,
             categories=self.base_classes,
         )
-        self.zero_shot_novel_classes_test_method = BaseTestStep(
+        self.zero_shot_novel_classes_test_method = ZeroShotTestStep(
             model=self.clip_model,
             batch_size=self.test_batch_size,
             categories=self.novel_classes,
@@ -225,7 +225,7 @@ class CoCoOpSystem:
             grl=self.grl,
             mlp_adversary=self.mlp_adversary,
             debug=self.debug,
-        ) if not self.using_kl_adv else KLAdversarial(
+        ) if not self.using_kl[1] else KLAdversarial(
             lambda_adv=0.05,
             model=self.model,
             optimizer=self.optimizer,
@@ -235,11 +235,15 @@ class CoCoOpSystem:
             lambda_kl=self.lambda_kl[1],
             debug=self.debug,
         )
-        self.basic_train_method = KLCoCoOp(
+        self.basic_train_method = BaseCoCoOp(
             model=self.model,
             optimizer=self.optimizer,
-            lambda_kl=self.lambda_kl[0],
             debug=self.debug,
+        ) if not self.using_kl[0] else KLCoCoOp(
+            model=self.model,
+            optimizer=self.optimizer,
+            debug=self.debug,
+            lambda_kl=self.lambda_kl[0],
         )
 
     def train(self):
@@ -309,10 +313,17 @@ class CoCoOpSystem:
 
         for e in range(self.max_epoch):
 
-            total_loss, acc, ce_loss, kl_loss = method.train_step(
-                self.train_base,
-                self.base_batch_size,
-            )
+            if self.using_kl[0]:
+                total_loss, acc, ce_loss, kl_loss = method.train_step(
+                    self.train_base,
+                    self.base_batch_size,
+                )
+            else:
+                total_loss, acc, ce_loss = method.train_step(
+                    self.train_base,
+                    self.base_batch_size,
+                )
+                kl_loss = None
 
             self.logger.log_training_base(
                 e,
@@ -339,7 +350,7 @@ class CoCoOpSystem:
                 kl_loss=kl_loss,
                 base_val_acc=base_val_acc,
                 lr=self.optimizer.param_groups[0]["lr"],
-                patience_counter=patience_counter,
+                pat_c=patience_counter,
             )
             pbar.update(1)
             c += 1
@@ -421,7 +432,7 @@ class CoCoOpSystem:
                 adv_loss=adv_loss,
                 base_val_acc=base_val_acc,
                 lr=self.optimizer.param_groups[0]["lr"],
-                patience_counter=patience_counter,
+                pat_c=patience_counter,
             )
             pbar.update(1)
 

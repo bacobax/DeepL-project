@@ -20,7 +20,7 @@ cocoop:
       mlp_lr: 0.002
       weight_decay: 0.0008
       momentum: 0.8
-  skip_tests: [true, true, false]
+  skip_tests: [true, false, false]
   #train_base_checkpoint_path: "./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth"
   prompt_learner_opt:
     n_ctx: 8
@@ -29,7 +29,7 @@ cocoop:
     csc: false
   kl_loss_opt:
     lambda_kl: [0.15, 0.1]
-    using_kl_adv: false
+    using_kl: [true, false]
   adv_training_opt:
     batch_size: 4
     warmup_lambda_adv: 5

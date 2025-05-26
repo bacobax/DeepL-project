@@ -11,7 +11,7 @@ coop:
 
 cocoop:
   cnn_model: "ViT-B/32"
-  batch_size: 10
+  test_batch_size: 10
   optimizer_configs:
     - prompt_lr: 0.002
       weight_decay: 0.0001
@@ -29,8 +29,9 @@ cocoop:
     csc: false
   kl_loss_opt:
     lambda_kl: [0.1, 0.1]
-    using_kl_adv: false
+    using_kl: [true, false]
   adv_training_opt:
+    batch_size: 4
     warmup_lambda_adv: 6
     adv_training_epochs: 15
     lambda_adv: 0.2
@@ -39,6 +40,7 @@ cocoop:
       hidden_dim: 592
       hidden_layers: 3
   base_training_opt:
+    batch_size: 10
     warmup_epoch: 2
     warmup_cons_lr: 0.00001
     epochs: 0
