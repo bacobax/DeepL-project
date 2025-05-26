@@ -22,7 +22,7 @@ class BaseCoCoOp(TrainingMethod):
             optimizer: Any,
             debug: bool = False
     ) -> None:
-        super().__init__(model, optimizer, "Base CoCoOp + KL", debug)
+        super().__init__(model, optimizer, "Base CoCoOp", debug)
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """

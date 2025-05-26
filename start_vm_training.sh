@@ -11,8 +11,8 @@ LOG_DIR=logs
 
 DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
-RUN_PREFIX="NO_KL_ADV_IMG_FT_8_CTX"
-HPARAMS_CONFS=("balanced" "unbalanced" "augmented")  # Add your .yaml config names without extension
+RUN_PREFIX="from_yaml"
+HPARAMS_CONFS=("base_no_kl_adv_no_kl_8_ctx" "base_kl_adv_no_kl_8_ctx" "all_adv_training_8_ctx" "all_adv_training_8_ctx_base_cluster_RN50")  # Add your .yaml config names without extension
 DEBUG="true"
 
 # This will be set inside the loop

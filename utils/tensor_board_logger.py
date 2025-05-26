@@ -51,7 +51,8 @@ class TensorboardLogger:
         self.writer.add_scalar("learning_rate", lr, epoch)
         self.writer.add_scalar("train_base/ce_loss", ce_loss, epoch)
         self.writer.add_scalar("train_base/ce_accuracy", acc, epoch)
-        self.writer.add_scalar("train_base/kl_loss", kl_loss, epoch)
+        if kl_loss is not None:
+            self.writer.add_scalar("train_base/kl_loss", kl_loss, epoch)
         self.writer.add_scalar("train_base/total_loss", total_loss, epoch)
 
     def log_training_adv(self, epoch, lambda_adv, ce_loss, acc, adv_loss, total_loss, kl_loss=None):

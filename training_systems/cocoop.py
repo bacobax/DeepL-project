@@ -259,7 +259,7 @@ class CoCoOpSystem:
                 self.save_model(path="./bin/cocoop", prefix="after_first_train_")
 
             if not self.skip_tests[1]:
-                print("Skipping base accuracy test")
+                print("Doing base accuracy test")
                 base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
                 self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
         else:
@@ -286,7 +286,7 @@ class CoCoOpSystem:
                 print("Model parameters have changed after adversarial training.")
 
         if not self.skip_tests[2]:
-            print("Skipping base accuracy test")
+            print("Doing post-adv. accuracy test")
             base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
             self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
 
@@ -320,11 +320,12 @@ class CoCoOpSystem:
                     self.base_batch_size,
                 )
             else:
-                total_loss, acc, ce_loss = method.train_step(
+                total_loss, acc = method.train_step(
                     self.train_base,
                     self.base_batch_size,
                 )
                 kl_loss = None
+                ce_loss = total_loss
 
             self.logger.log_training_base(
                 e,
@@ -388,7 +389,7 @@ class CoCoOpSystem:
 
             method.update_lambda_adv(new_lambda_adv)
 
-            if self.using_kl_adv:
+            if self.using_kl[1]:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.base_batch_size,

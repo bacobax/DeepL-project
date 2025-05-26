@@ -29,7 +29,7 @@ cocoop:
     csc: false
   kl_loss_opt:
     lambda_kl: [0.15, 0.1]
-    using_kl: [true, false]
+    using_kl: [false, false]
   adv_training_opt:
     batch_size: 4
     warmup_lambda_adv: 5
