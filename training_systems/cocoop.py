@@ -291,7 +291,8 @@ class CoCoOpSystem:
             self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
 
         self.logger.close()
-        self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
+        if self.adv_training_epochs != 0:
+            self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
 
     def _train_base_phase(self, best_model_path):
         """
