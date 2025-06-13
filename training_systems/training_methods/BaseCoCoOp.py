@@ -1,3 +1,7 @@
+"""
+This module defines the BaseCoCoOp training method, a baseline implementation for CoCoOp-based optimization.
+It includes metric tracking, data loading, and training step execution using standard cross-entropy loss.
+"""
 import random
 from typing import Dict, Any
 
@@ -13,7 +17,8 @@ from utils.kl import get_kl_loss
 
 class BaseCoCoOp(TrainingMethod):
     """
-    Adversarial training method.
+    BaseCoCoOp implements a simple training routine based on cross-entropy loss without adversarial components.
+    This class inherits from TrainingMethod and provides basic training loop functionalities.
     """
 
     def __init__(
@@ -26,8 +31,12 @@ class BaseCoCoOp(TrainingMethod):
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
-        Get the metrics for the adversarial training method.
+        Initializes and returns the performance metrics used during training.
+
+        Returns:
+            Dict[str, AverageMeter]: A dictionary with average meters for loss and accuracy.
         """
+
 
         return {
             "loss_metric": AverageMeter(),
@@ -36,9 +45,15 @@ class BaseCoCoOp(TrainingMethod):
 
     def get_data_loader(self, dataset: ContiguousLabelDataset, batch_size: int) -> DataLoader:
         """
-        Get the data loader for the adversarial training method.
-        """
+        Creates and returns a DataLoader for the given dataset.
 
+        Args:
+            dataset (ContiguousLabelDataset): Dataset to load samples from.
+            batch_size (int): Number of samples per batch.
+
+        Returns:
+            DataLoader: PyTorch DataLoader configured with shuffle and multiple workers.
+        """
         return DataLoader(
             dataset,
             batch_size=batch_size,
@@ -53,6 +68,18 @@ class BaseCoCoOp(TrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
+        """
+        Executes the forward and backward pass for the BaseCoCoOp training method.
+
+        Args:
+            sample (Tuple[Tensor, Tensor]): Batch of input data and targets.
+            batch_idx (int): Index of the current batch.
+            metrics (Dict[str, AverageMeter]): Dictionary of metrics to be updated.
+            dataset (ContiguousLabelDataset): Dataset object (unused in this implementation).
+
+        Returns:
+            Dict[str, float]: Dictionary with current loss and accuracy values.
+        """
         # Load data into GPU
         inputs, targets = sample
         # === Pseudo-base: cross-entropy ===
@@ -80,9 +107,27 @@ class BaseCoCoOp(TrainingMethod):
         }
 
     def debug_metrics_to_pbar_args(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
+        """
+        Passes debug metrics directly to be displayed in the progress bar.
+
+        Args:
+            debug_metrics (Dict[str, float]): Metrics from the current step.
+
+        Returns:
+            Dict[str, float]: Unmodified metrics suitable for display.
+        """
         return debug_metrics
 
     def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+        """
+        Extracts and returns the average loss and accuracy metrics after a training step.
+
+        Args:
+            metrics (Dict[str, AverageMeter]): Dictionary containing tracked metrics.
+
+        Returns:
+            List[float]: A list containing the average loss and accuracy values.
+        """
         return [
             metrics["loss_metric"].avg,
             metrics["accuracy_metric"].avg,

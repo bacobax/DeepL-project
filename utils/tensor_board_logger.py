@@ -7,30 +7,74 @@ def harmonic_mean(a, b):
     
 
 class CSVLogger:
+    """
+    A simple logger that writes training metrics to a CSV file.
+
+    Attributes:
+        filename (str): The path to the output CSV file.
+        file (file object): Open file handle for writing.
+    """
     def __init__(self, filename):
+        """
+        Initializes the CSV logger and creates the output directory and file.
+
+        Args:
+            filename (str): Path to the CSV file for logging.
+        """
         self.filename = filename
         os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create folder if it doesn't exist
         self.file = open(filename, "w")
         self.file.write("epoch,base_acc,novel_acc,harmonic_mean\n")
 
     def log(self, epoch, base_acc, novel_acc):
+        """
+        Logs a training epoch's results including harmonic mean to the CSV file.
+
+        Args:
+            epoch (int): The epoch number.
+            base_acc (float): Accuracy on base classes.
+            novel_acc (float): Accuracy on novel classes.
+        """
         hm = harmonic_mean(base_acc, novel_acc)
         self.file.write(f"{epoch},{base_acc},{novel_acc},{hm}\n")
         self.file.flush()
         print(f"Logged: epoch {epoch}, base_acc {base_acc}, novel_acc {novel_acc}, harmonic_mean {hm}")
 
     def close(self):
+        """
+        Closes the CSV file.
+        """
         self.file.close()
 
 
 class BaseAndNovelMetrics:
+    """
+    Tracks base and novel accuracy values and their harmonic mean across epochs.
+
+    Attributes:
+        tmp (List[Tuple[int, float, float, float]]): Logged metrics per epoch.
+    """
     def __init__(self):
         self.tmp = []
 
     def update(self, epoch, base_acc, novel_acc):
+        """
+        Records a new set of metrics for a specific epoch.
+
+        Args:
+            epoch (int): Epoch number.
+            base_acc (float): Accuracy on base classes.
+            novel_acc (float): Accuracy on novel classes.
+        """
         self.tmp.append((epoch, base_acc, novel_acc, harmonic_mean(base_acc, novel_acc)))
 
     def get_metrics(self):
+        """
+        Retrieves the collected metrics.
+
+        Returns:
+            List[Tuple[int, float, float, float]] or None: Logged metrics or None if empty.
+        """
         if len(self.tmp) == 0:
             return None
         return self.tmp
@@ -38,16 +82,48 @@ class BaseAndNovelMetrics:
 
 
 class TensorboardLogger:
+    """
+    Handles logging of training and evaluation metrics to TensorBoard and CSV.
+
+    Attributes:
+        writer (SummaryWriter): TensorBoard writer instance.
+        csv_logger (CSVLogger): CSV logger instance for persistent metric storage.
+        hparams (dict): Hyperparameters dictionary.
+        base_and_novel_metrics (BaseAndNovelMetrics): Metric tracker.
+    """
     def __init__(self, writer: SummaryWriter):
+        """
+        Initializes the TensorboardLogger.
+
+        Args:
+            writer (SummaryWriter): TensorBoard writer instance.
+        """
         self.writer = writer
         self.csv_logger = CSVLogger(f"{writer.log_dir}/metrics.csv")
         self.hparams = None
         self.base_and_novel_metrics = BaseAndNovelMetrics()
 
     def log_hparams(self, hparams: dict):
+        """
+        Stores hyperparameters for later logging.
+
+        Args:
+            hparams (dict): Hyperparameters dictionary.
+        """
         self.hparams = hparams
 
     def log_training_base(self, epoch, lr, ce_loss, acc, kl_loss, total_loss):
+        """
+        Logs training metrics for the base training phase.
+
+        Args:
+            epoch (int): Current epoch.
+            lr (float): Learning rate.
+            ce_loss (float): Cross entropy loss.
+            acc (float): Accuracy.
+            kl_loss (float or None): KL divergence loss, optional.
+            total_loss (float): Total loss.
+        """
         self.writer.add_scalar("learning_rate", lr, epoch)
         self.writer.add_scalar("train_base/ce_loss", ce_loss, epoch)
         self.writer.add_scalar("train_base/ce_accuracy", acc, epoch)
@@ -56,6 +132,18 @@ class TensorboardLogger:
         self.writer.add_scalar("train_base/total_loss", total_loss, epoch)
 
     def log_training_adv(self, epoch, lambda_adv, ce_loss, acc, adv_loss, total_loss, kl_loss=None):
+        """
+        Logs training metrics for the adversarial training phase.
+
+        Args:
+            epoch (int): Current epoch.
+            lambda_adv (float): Adversarial loss weight.
+            ce_loss (float): Cross entropy loss.
+            acc (float): Accuracy.
+            adv_loss (float): Adversarial loss.
+            total_loss (float): Total loss.
+            kl_loss (float or None): KL divergence loss, optional.
+        """
         self.writer.add_scalar("lambda_adv", lambda_adv, epoch)
         self.writer.add_scalar("train_adv/ce_loss", ce_loss, epoch)
         self.writer.add_scalar("train_adv/ce_accuracy", acc, epoch)
@@ -65,6 +153,17 @@ class TensorboardLogger:
         self.writer.add_scalar("train_adv/total_loss", total_loss, epoch)
 
     def log_validation(self, epoch, base_loss, base_acc, novel_loss, novel_acc, is_adv=False):
+        """
+        Logs validation metrics.
+
+        Args:
+            epoch (int): Current epoch.
+            base_loss (float): Loss on base classes.
+            base_acc (float): Accuracy on base classes.
+            novel_loss (float): Loss on novel classes.
+            novel_acc (float): Accuracy on novel classes.
+            is_adv (bool): Whether validation is adversarial.
+        """
         prefix = "validation_adv" if is_adv else "validation"
         self.writer.add_scalar(f"{prefix}_base/loss", base_loss, epoch)
         self.writer.add_scalar(f"{prefix}_base/accuracy", base_acc, epoch)
@@ -72,6 +171,15 @@ class TensorboardLogger:
         self.writer.add_scalar(f"{prefix}_novel/accuracy", novel_acc, epoch)
 
     def log_final_metrics(self, tag, base_acc, novel_acc, step):
+        """
+        Logs final accuracy metrics and updates CSV and metric tracker.
+
+        Args:
+            tag (str): Tag name for TensorBoard.
+            base_acc (float): Accuracy on base classes.
+            novel_acc (float): Accuracy on novel classes.
+            step (int): Training step or epoch index.
+        """
         harmonic = harmonic_mean(base_acc, novel_acc)
         self.writer.add_scalars(tag, {
             "Harmonic Mean": harmonic,
@@ -87,9 +195,20 @@ class TensorboardLogger:
         self.writer.flush()
 
     def log_test_accuracy(self, step, acc, label):
+        """
+        Logs test accuracy for a given label.
+
+        Args:
+            step (int): Step or epoch index.
+            acc (float): Accuracy value.
+            label (str): Label name for the accuracy metric.
+        """
         self.writer.add_scalar(f"{label}/accuracy", acc, step)
 
     def close(self):
+        """
+        Closes the logger, writes hyperparameters and final metrics if available.
+        """
         metrics = self.base_and_novel_metrics.get_metrics() or []
 
 
@@ -106,6 +225,7 @@ class TensorboardLogger:
         if self.hparams is not None and metrics:
 
             tmp = {}
+            # Set the prefix based on whether metrics are from base phase (index 0) or adversarial phase (index 1)
             for idx, m in enumerate(metrics):
                 prefix = "after_base" if idx == 0 else "after_adv"
                 tmp[f"epoch_{prefix}"] = m[0]

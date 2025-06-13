@@ -14,6 +14,19 @@ from sklearn.metrics.pairwise import cosine_distances
 def cluster_categories(
      device, cnn, n_clusters=2, variance=0.95
 ):
+    """
+    Clusters base classes using visual features extracted from a CLIP model. Applies PCA to reduce dimensionality
+    and Agglomerative Clustering on cosine distances to group the categories.
+
+    Args:
+        device (torch.device): The device to run computations on (CPU/GPU).
+        cnn (str): CLIP model architecture name (e.g., "ViT-B/32").
+        n_clusters (int): Number of clusters to generate.
+        variance (float): Variance ratio to preserve during PCA.
+
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
+    """
 
     # initialize clip model with ViT
     clip_model, preprocess = clip.load(cnn)
@@ -74,6 +87,18 @@ def cluster_categories(
 
 
 def conditional_clustering(n_cluster, variance, cnn, device):
+    """
+    Loads existing cluster labels from disk if available, otherwise computes and saves new cluster assignments.
+
+    Args:
+        n_cluster (int): Number of clusters to generate.
+        variance (float): Variance ratio to preserve during PCA.
+        cnn (str): CLIP model architecture name (used for naming output files).
+        device (torch.device): The device to run computations on.
+
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Dictionaries for integer-labeled and text-labeled cluster assignments.
+    """
     cnn_sanitized = cnn.replace("/", "_")
     save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn_sanitized}"
     os.makedirs(save_dir, exist_ok=True)

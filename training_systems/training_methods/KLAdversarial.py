@@ -1,3 +1,7 @@
+"""
+This module implements the KLAdversarial training method, which incorporates cross-entropy,
+KL divergence, and adversarial losses for robust representation learning using pseudo-base and pseudo-novel class splits.
+"""
 import random
 from typing import Dict, Any
 
@@ -16,7 +20,15 @@ from model.cocoop.mlp_adversary import AdversarialMLP, GradientReversalLayer
 
 class KLAdversarial(TrainingMethod):
     """
-    Adversarial training method.
+    KLAdversarial training method combining standard cross-entropy loss, KL divergence loss from a frozen teacher model,
+    and an adversarial binary classification loss using a Gradient Reversal Layer.
+
+    Attributes:
+        cls_cluster_dict (Dict[int, Any]): Mapping from class labels to cluster groups.
+        grl (GradientReversalLayer): Gradient reversal layer used for adversarial loss computation.
+        mlp_adversary (AdversarialMLP): Adversarial model that predicts cluster labels.
+        lambda_adv (float): Weight for the adversarial loss.
+        lambda_kl (float): Weight for the KL divergence loss.
     """
 
     def __init__(
@@ -40,7 +52,11 @@ class KLAdversarial(TrainingMethod):
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
-        Get the metrics for the adversarial training method.
+        Initializes average meters to track total loss, cross-entropy loss, adversarial loss,
+        KL divergence loss, and classification accuracy.
+
+        Returns:
+            Dict[str, AverageMeter]: Dictionary mapping metric names to AverageMeter instances.
         """
         return {
             "total_loss_meter": AverageMeter(),
@@ -85,6 +101,19 @@ class KLAdversarial(TrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
+        """
+        Executes a forward and backward pass using pseudo-base and pseudo-novel data.
+
+        Args:
+            sample (Tuple[List[Tuple[Tensor, int]], List[Tuple[Tensor, int]]]): Tuple of base and novel sample batches.
+            batch_idx (int): Index of the batch in the training loop.
+            metrics (Dict[str, AverageMeter]): Dictionary to update with computed losses and accuracy.
+            dataset (ContiguousLabelDataset): Dataset providing index-to-category mapping and other utilities.
+
+        Returns:
+            Dict[str, float]: Dictionary containing scalar values for total loss, CE loss, KL loss,
+                              adversarial loss, and classification accuracy.
+        """
         # Load data into GPU
         base_batch, novel_batch = sample
 
@@ -152,9 +181,27 @@ class KLAdversarial(TrainingMethod):
         }
 
     def debug_metrics_to_pbar_args(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
+        """
+        Pass-through for debug metrics to be displayed in the training progress bar.
+
+        Args:
+            debug_metrics (Dict[str, float]): Metrics gathered during training iteration.
+
+        Returns:
+            Dict[str, float]: Same dictionary of metrics for display.
+        """
         return debug_metrics
 
     def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+        """
+        Extracts average metric values to summarize training step performance.
+
+        Args:
+            metrics (Dict[str, AverageMeter]): Metrics tracked during training.
+
+        Returns:
+            List[float]: Average values for total loss, accuracy, CE loss, KL loss, and adversarial loss.
+        """
         return [
             metrics["total_loss_meter"].avg,
             metrics["accuracy_meter"].avg,
@@ -165,7 +212,10 @@ class KLAdversarial(TrainingMethod):
 
     def update_lambda_adv(self, lambda_adv) -> None:
         """
-        Update the lambda_adv parameter.
+        Dynamically update the adversarial loss weight.
+
+        Args:
+            lambda_adv (float): New weight to assign to adversarial loss term.
         """
         self.lambda_adv = lambda_adv
 

@@ -195,6 +195,9 @@ class CoCoOpSystem:
         self._set_test_methods()
 
     def _set_test_methods(self):
+        """
+        Initializes the zero-shot and fine-tuned test step evaluators for both base and novel class splits.
+        """
         self.zero_shot_base_classes_test_method = ZeroShotTestStep(
             model=self.clip_model,
             batch_size=self.test_batch_size,
@@ -211,12 +214,19 @@ class CoCoOpSystem:
         )
 
     def _set_eval_method(self):
+        """
+        Initializes the evaluation method used during validation.
+        """
         self.eval_method = EvalStep(
             model=self.model,
             batch_size=self.test_batch_size,
         )
 
     def _set_train_methods(self):
+        """
+        Initializes the training method used for both base and adversarial phases, depending on whether KL loss is enabled.
+        Chooses between standard and KL-regularized training methods.
+        """
         self.adversarial_method = Adversarial(
             lambda_adv=0.05,
             model=self.model,

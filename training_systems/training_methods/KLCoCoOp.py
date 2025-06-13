@@ -1,3 +1,7 @@
+"""
+This module defines the KLCoCoOp training method, which combines standard cross-entropy loss with KL divergence
+between a model's predictions and a frozen teacher (e.g., CLIP) to enhance generalization to novel classes.
+"""
 import random
 from typing import Dict, Any
 
@@ -13,7 +17,11 @@ from utils.kl import get_kl_loss
 
 class KLCoCoOp(TrainingMethod):
     """
-    Adversarial training method.
+    KLCoCoOp training method combining cross-entropy classification on pseudo-base samples and KL divergence
+    loss on pseudo-novel samples. It encourages transferability and generalization by mixing base and novel categories.
+
+    Attributes:
+        lambda_kl (float): Weight for the KL divergence loss component.
     """
 
     def __init__(
@@ -28,9 +36,11 @@ class KLCoCoOp(TrainingMethod):
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
-        Get the metrics for the adversarial training method.
-        """
+        Initializes training metrics including total, cross-entropy, KL divergence losses, and classification accuracy.
 
+        Returns:
+            Dict[str, AverageMeter]: Dictionary of metric names mapped to their respective AverageMeter instances.
+        """
         return {
             "total_loss_metric": AverageMeter(),
             "ce_loss_metric": AverageMeter(),
@@ -40,7 +50,14 @@ class KLCoCoOp(TrainingMethod):
 
     def get_data_loader(self, dataset: ContiguousLabelDataset, batch_size: int) -> DataLoader:
         """
-        Get the data loader for the adversarial training method.
+        Returns a DataLoader that splits each batch into pseudo-base and pseudo-novel subsets.
+
+        Args:
+            dataset (ContiguousLabelDataset): The dataset used for training.
+            batch_size (int): Number of samples per batch.
+
+        Returns:
+            DataLoader: PyTorch DataLoader with a custom collate function to separate base and novel samples.
         """
 
         def custom_collate(batch):
@@ -73,6 +90,18 @@ class KLCoCoOp(TrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
+        """
+        Performs forward and backward passes, computing CE loss on pseudo-base and KL loss on pseudo-novel samples.
+
+        Args:
+            sample (Tuple[List[Tuple[Tensor, int]], List[Tuple[Tensor, int]]]): Tuple of pseudo-base and pseudo-novel batches.
+            batch_idx (int): Current batch index during training.
+            metrics (Dict[str, AverageMeter]): Dictionary to update with the training metrics.
+            dataset (ContiguousLabelDataset): Dataset object used for KL divergence lookup.
+
+        Returns:
+            Dict[str, float]: Scalar values of total loss, CE loss, KL loss, and CE accuracy.
+        """
         # Load data into GPU
         base_batch, novel_batch = sample
 
@@ -121,9 +150,27 @@ class KLCoCoOp(TrainingMethod):
         }
 
     def debug_metrics_to_pbar_args(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
+        """
+        Prepares debug metrics for visualization in progress bars or logs.
+
+        Args:
+            debug_metrics (Dict[str, float]): Dictionary of debug metrics from the current step.
+
+        Returns:
+            Dict[str, float]: Same metrics for direct display.
+        """
         return debug_metrics
 
     def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+        """
+        Returns the average values of tracked metrics after a training step.
+
+        Args:
+            metrics (Dict[str, AverageMeter]): Metric dictionary to extract averages from.
+
+        Returns:
+            List[float]: Averages of total loss, accuracy, CE loss, and KL loss.
+        """
         return [
             metrics["total_loss_metric"].avg,
             metrics["accuracy_metric"].avg,

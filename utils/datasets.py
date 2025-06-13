@@ -4,12 +4,15 @@ CLASS_NAMES = ["pink primrose", "hard-leaved pocket orchid", "canterbury bells",
 
 
 def get_data(data_dir="./data", transform=None):
-    """Load Flowers102 train, validation and test sets.
+    """
+    Loads the Flowers102 dataset from torchvision, returning separate splits for training, validation, and testing.
+
     Args:
-        data_dir (str): Directory where the dataset will be stored.
-        transform (torch.Compose)
+        data_dir (str): Directory where the dataset will be downloaded/stored. Defaults to "./data".
+        transform (torchvision.transforms.Compose or None): Transformations to apply to each image.
+
     Returns:
-        tuple: A tuple containing the train, validation, and test sets.
+        tuple: A tuple (train, val, test) of Flowers102 dataset splits.
     """
     train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=transform)
     val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=transform)
@@ -58,6 +61,16 @@ def split_data(dataset, base_classes):
 
 
 class ContiguousLabelDataset(torch.utils.data.Dataset):
+    """
+    A dataset wrapper that remaps arbitrary class labels to contiguous integers starting from 0.
+
+    This is useful for classification tasks where models expect class indices to be in a 0-based contiguous range.
+
+    Attributes:
+        dataset (Dataset): The original dataset to wrap.
+        cat2idx (Dict[Any, int]): Mapping from original class labels to contiguous integer indices.
+        idx2cat (Dict[int, Any]): Reverse mapping from indices back to original class labels.
+    """
     def __init__(self, dataset):
         self.dataset = dataset
         # Extract all labels from the dataset

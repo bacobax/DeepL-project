@@ -21,6 +21,15 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    # Assign parsed arguments to variables
+    # Display which device is being used
+    # Handle MPS backend by setting default tensor type to float32
+    # Indicate whether CoOp or CoCoOp is used for training
+    # Load training configuration from YAML file
+
+    # Initialize and train using CoOpSystem if specified in arguments
+    # Initialize and train using CoCoOpSystem otherwise
     args = parse_args()
 
     device = args.device

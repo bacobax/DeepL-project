@@ -5,6 +5,20 @@ from utils.datasets import CLASS_NAMES
 
 
 def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
+    """
+    Computes the KL divergence between the student model's predictions and the CLIP model's predictions
+    for a batch of novel class images.
+
+    Args:
+        device (torch.device): The device (CPU or CUDA) to perform computation on.
+        inputs_novel (Tensor): A batch of input images from novel classes.
+        model (nn.Module): The student model that includes a CLIP backbone and prompt learner.
+        targets_novel (List[int]): Target labels corresponding to the novel class inputs.
+        tmp_dataset (ContiguousLabelDataset): Dataset wrapper with label-to-category mappings.
+
+    Returns:
+        Tensor: A scalar tensor representing the KL divergence loss.
+    """
     targets_novel_tensor = torch.tensor(targets_novel).to(device)
     categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
     # print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")

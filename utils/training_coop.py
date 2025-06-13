@@ -1,3 +1,7 @@
+"""
+This module provides training, evaluation, and testing functions for the CoOp model and standard CLIP evaluation,
+including fine-tuning and zero-shot classification on image datasets.
+"""
 from clip.model import CLIP
 from torch.utils.data import DataLoader
 import torch
@@ -10,6 +14,20 @@ from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 @torch.no_grad()
 def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None):
+    """
+    Evaluates the model on a given dataset using cross-entropy loss.
+
+    Args:
+        model (nn.Module): The model to evaluate.
+        dataset (Dataset): Dataset to evaluate on.
+        cost_function (Callable): Loss function to use.
+        batch_size (int): Batch size for evaluation.
+        device (str): Computation device ("cuda" or "cpu").
+        new_classnames (List[int] or None): Optional list of class indices to temporarily substitute for evaluation.
+
+    Returns:
+        Tuple[float, float]: Average loss and accuracy.
+    """
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -33,6 +51,21 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_c
 
 
 def walk_the_dataset(correct, cost_function, dataloader, device, model, total, total_loss):
+    """
+    Iterates over the dataset and computes cumulative loss and accuracy.
+
+    Args:
+        correct (int): Running count of correct predictions.
+        cost_function (Callable): Loss function used.
+        dataloader (DataLoader): DataLoader for the dataset.
+        device (str): Computation device.
+        model (nn.Module): Model being evaluated.
+        total (int): Total number of samples evaluated so far.
+        total_loss (float): Accumulated loss value.
+
+    Returns:
+        Tuple[int, int, float]: Updated correct, total, and total_loss.
+    """
     for images, targets in tqdm(dataloader, desc="Validation", position=1, leave=False):
         images = images.to(device)
         targets = targets.to(device)
@@ -47,6 +80,19 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
 
 
 def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device="cuda"):
+    """
+    Performs one full training epoch for the CoOp model.
+
+    Args:
+        model (CustomCLIPCoOp): The model to train.
+        dataset (Dataset): Dataset to train on.
+        optimizer (Optimizer): Optimizer used for updating model parameters.
+        batch_size (int): Batch size for training.
+        device (str): Computation device.
+
+    Returns:
+        Tuple[float, float]: Average training loss and accuracy.
+    """
     samples = 0.0
     cumulative_loss = 0.0
     cumulative_accuracy = 0.0
@@ -98,6 +144,20 @@ def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device=
 
 @torch.no_grad()
 def test_step(model, dataset, batch_size, device, label="test", base=False):
+    """
+    Evaluates the model using either fine-tuned or base (zero-shot) strategy.
+
+    Args:
+        model (nn.Module): The model to test.
+        dataset (Dataset): Dataset for testing.
+        batch_size (int): Batch size for testing.
+        device (str): Device used for computation.
+        label (str): Label for the progress bar.
+        base (bool): Whether to use zero-shot CLIP instead of the fine-tuned model.
+
+    Returns:
+        float: Accuracy score.
+    """
     if not base:
         return finetuned_test_step(model, dataset, batch_size, device, label)
     else:
@@ -106,6 +166,19 @@ def test_step(model, dataset, batch_size, device, label="test", base=False):
 
 @torch.no_grad()
 def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, label="test"):
+    """
+    Evaluates a fine-tuned CustomCLIPCoOp model on the given dataset.
+
+    Args:
+        model (CustomCLIPCoOp): Fine-tuned CoOp model.
+        dataset (Dataset): Dataset for evaluation.
+        batch_size (int): Batch size.
+        device (str): Computation device.
+        label (str): Label for progress display.
+
+    Returns:
+        float: Accuracy of the model on the dataset.
+    """
     model.eval()
 
     tmp_dataset = ContiguousLabelDataset(dataset)
@@ -129,6 +202,20 @@ def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, labe
 
 @torch.no_grad()  # we don't want gradients
 def base_test_step(model: CLIP, dataset, categories, batch_size, device, label=""):
+    """
+    Evaluates a zero-shot CLIP model using cosine similarity between image and text embeddings.
+
+    Args:
+        model (CLIP): Pretrained CLIP model.
+        dataset (Dataset): Dataset to evaluate.
+        categories (List[int]): List of category indices to evaluate.
+        batch_size (int): Batch size for evaluation.
+        device (str): Computation device.
+        label (str): Optional label for progress bar.
+
+    Returns:
+        float: Accuracy of zero-shot CLIP classification.
+    """
     # let's set the model in evaluation mode
     model.eval()
 
