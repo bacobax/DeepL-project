@@ -49,3 +49,4 @@ cocoop:
     variance: 0.95
     vision_encoder: "ViT-B/32"
     method: "kmeans"
+    use_random_clustering: false
