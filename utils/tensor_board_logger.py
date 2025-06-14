@@ -2,9 +2,10 @@ import os
 
 from torch.utils.tensorboard import SummaryWriter
 
+
 def harmonic_mean(a, b):
     return 2 * (a * b) / (a + b)
-    
+
 
 class CSVLogger:
     """
@@ -14,6 +15,7 @@ class CSVLogger:
         filename (str): The path to the output CSV file.
         file (file object): Open file handle for writing.
     """
+
     def __init__(self, filename):
         """
         Initializes the CSV logger and creates the output directory and file.
@@ -22,7 +24,9 @@ class CSVLogger:
             filename (str): Path to the CSV file for logging.
         """
         self.filename = filename
-        os.makedirs(os.path.dirname(filename), exist_ok=True)  # Create folder if it doesn't exist
+        os.makedirs(
+            os.path.dirname(filename), exist_ok=True
+        )  # Create folder if it doesn't exist
         self.file = open(filename, "w")
         self.file.write("epoch,base_acc,novel_acc,harmonic_mean\n")
 
@@ -38,7 +42,9 @@ class CSVLogger:
         hm = harmonic_mean(base_acc, novel_acc)
         self.file.write(f"{epoch},{base_acc},{novel_acc},{hm}\n")
         self.file.flush()
-        print(f"Logged: epoch {epoch}, base_acc {base_acc}, novel_acc {novel_acc}, harmonic_mean {hm}")
+        print(
+            f"Logged: epoch {epoch}, base_acc {base_acc}, novel_acc {novel_acc}, harmonic_mean {hm}"
+        )
 
     def close(self):
         """
@@ -54,6 +60,7 @@ class BaseAndNovelMetrics:
     Attributes:
         tmp (List[Tuple[int, float, float, float]]): Logged metrics per epoch.
     """
+
     def __init__(self):
         self.tmp = []
 
@@ -66,7 +73,9 @@ class BaseAndNovelMetrics:
             base_acc (float): Accuracy on base classes.
             novel_acc (float): Accuracy on novel classes.
         """
-        self.tmp.append((epoch, base_acc, novel_acc, harmonic_mean(base_acc, novel_acc)))
+        self.tmp.append(
+            (epoch, base_acc, novel_acc, harmonic_mean(base_acc, novel_acc))
+        )
 
     def get_metrics(self):
         """
@@ -80,7 +89,6 @@ class BaseAndNovelMetrics:
         return self.tmp
 
 
-
 class TensorboardLogger:
     """
     Handles logging of training and evaluation metrics to TensorBoard and CSV.
@@ -91,6 +99,7 @@ class TensorboardLogger:
         hparams (dict): Hyperparameters dictionary.
         base_and_novel_metrics (BaseAndNovelMetrics): Metric tracker.
     """
+
     def __init__(self, writer: SummaryWriter):
         """
         Initializes the TensorboardLogger.
@@ -131,7 +140,9 @@ class TensorboardLogger:
             self.writer.add_scalar("train_base/kl_loss", kl_loss, epoch)
         self.writer.add_scalar("train_base/total_loss", total_loss, epoch)
 
-    def log_training_adv(self, epoch, lambda_adv, ce_loss, acc, adv_loss, total_loss, kl_loss=None):
+    def log_training_adv(
+        self, epoch, lambda_adv, ce_loss, acc, adv_loss, total_loss, kl_loss=None
+    ):
         """
         Logs training metrics for the adversarial training phase.
 
@@ -152,7 +163,9 @@ class TensorboardLogger:
             self.writer.add_scalar("train_adv/kl_loss", kl_loss, epoch)
         self.writer.add_scalar("train_adv/total_loss", total_loss, epoch)
 
-    def log_validation(self, epoch, base_loss, base_acc, novel_loss, novel_acc, is_adv=False):
+    def log_validation(
+        self, epoch, base_loss, base_acc, novel_loss, novel_acc, is_adv=False
+    ):
         """
         Logs validation metrics.
 
@@ -164,7 +177,12 @@ class TensorboardLogger:
             novel_acc (float): Accuracy on novel classes.
             is_adv (bool): Whether validation is adversarial.
         """
-        prefix = "validation_adv" if is_adv else "validation"
+        self.writer.add_scalar(f"validation_base/loss", base_loss, epoch)
+        self.writer.add_scalar(f"validation_base/accuracy", base_acc, epoch)
+        self.writer.add_scalar(f"validation_novel/loss", novel_loss, epoch)
+        self.writer.add_scalar(f"validation_novel/accuracy", novel_acc, epoch)
+
+        prefix = "validation_adv" if is_adv else "validation_ce"
         self.writer.add_scalar(f"{prefix}_base/loss", base_loss, epoch)
         self.writer.add_scalar(f"{prefix}_base/accuracy", base_acc, epoch)
         self.writer.add_scalar(f"{prefix}_novel/loss", novel_loss, epoch)
@@ -181,11 +199,15 @@ class TensorboardLogger:
             step (int): Training step or epoch index.
         """
         harmonic = harmonic_mean(base_acc, novel_acc)
-        self.writer.add_scalars(tag, {
-            "Harmonic Mean": harmonic,
-            "Base Accuracy": base_acc,
-            "Novel Accuracy": novel_acc,
-        }, global_step=step + 1)
+        self.writer.add_scalars(
+            tag,
+            {
+                "Harmonic Mean": harmonic,
+                "Base Accuracy": base_acc,
+                "Novel Accuracy": novel_acc,
+            },
+            global_step=step + 1,
+        )
 
         self.csv_logger.log(step + 1, base_acc, novel_acc)
 
@@ -210,7 +232,6 @@ class TensorboardLogger:
         Closes the logger, writes hyperparameters and final metrics if available.
         """
         metrics = self.base_and_novel_metrics.get_metrics() or []
-
 
         """
         metric_dict = {
