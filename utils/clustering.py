@@ -11,9 +11,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_distances
 
 
-def cluster_categories(
-     device, cnn, n_clusters=2, variance=0.95
-):
+def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../data"):
     """
     Clusters base classes using visual features extracted from a CLIP model. Applies PCA to reduce dimensionality
     and Agglomerative Clustering on cosine distances to group the categories.
@@ -32,7 +30,7 @@ def cluster_categories(
     clip_model, preprocess = clip.load(cnn)
     clip_model = clip_model.to(device)
 
-    train_set, _, _ = get_data(data_dir="../data", transform=preprocess)
+    train_set, _, _ = get_data(data_dir=data_dir, transform=preprocess)
 
     # split classes into base and novel
     base_classes, _ = base_novel_categories(train_set)
@@ -63,14 +61,14 @@ def cluster_categories(
     pca = PCA(n_components=variance)
     X_reduced = pca.fit_transform(class_ft_array)
 
-    print(f"Reduced feature shape: {X_reduced.shape}, Variance explained: {pca.explained_variance_ratio_.sum()}")
+    print(
+        f"Reduced feature shape: {X_reduced.shape}, Variance explained: {pca.explained_variance_ratio_.sum()}"
+    )
 
     cosine_dist = cosine_distances(X_reduced)
     # Step 5: Agglomerative clustering
     agglo = AgglomerativeClustering(
-        n_clusters=n_clusters,
-        metric='precomputed',
-        linkage='average'
+        n_clusters=n_clusters, metric="precomputed", linkage="average"
     )
     cluster_labels = agglo.fit_predict(cosine_dist)
 
@@ -86,7 +84,45 @@ def cluster_categories(
     return cluster_labels, cluster_labels_text
 
 
-def conditional_clustering(n_cluster, variance, cnn, device):
+def random_clustering(
+    n_cluster,
+    seed=42,
+    data_dir="../data",
+):
+    """
+    Generates random cluster assignments for a given number of clusters.
+
+    Args:
+        n_cluster (int): Number of clusters to generate.
+        seed (int): Random seed for reproducibility.
+        data_dir (str): Directory where the dataset is stored.
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
+    """
+
+    np.random.seed(seed)
+    train_set, _, _ = get_data(data_dir=data_dir)
+    base_classes, _ = base_novel_categories(train_set)
+
+    # split train_base into n_cluster clusters
+    cluster_labels = {}
+    for i, c in enumerate(base_classes):
+        cluster_labels[c] = np.random.randint(0, n_cluster)
+
+    cluster_labels_text = {
+        CLASS_NAMES[base_class]: int(cluster)
+        for base_class, cluster in enumerate(cluster_labels.values())
+    }
+
+    cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
+
+    # reset the random seed
+    np.random.seed(None)
+
+    return cluster_dict_int, cluster_labels_text
+
+
+def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data"):
     """
     Loads existing cluster labels from disk if available, otherwise computes and saves new cluster assignments.
 
@@ -118,7 +154,7 @@ def conditional_clustering(n_cluster, variance, cnn, device):
         print("🟧 NO CLUSTERS FILES FOUND. Loading existing cluster labels...")
         # cluster the base classes
         cluster_labels, cluster_labels_text = cluster_categories(
-            device, n_clusters=n_cluster, variance=variance, cnn=cnn
+            device, n_clusters=n_cluster, variance=variance, cnn=cnn, data_dir=data_dir
         )
         cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
         with open(int_categories_path, "wb") as f:
@@ -142,7 +178,6 @@ if __name__ == "__main__":
         if torch.cuda.is_available()
         else "mps" if torch.backends.mps.is_available() else "cpu"
     )
-
 
     cls_cluster_dict_int, cluster_labels_text = conditional_clustering(
         N_CLUSTERS, VARIANCE, CNN, DEVICE

@@ -2,6 +2,7 @@
 Main module for training the CoCoOp system, supporting both base and adversarial training phases.
 Includes configuration, data loading, model preparation, and training logic for zero-shot learning with CLIP.
 """
+
 import os
 import math
 from copy import deepcopy
@@ -20,9 +21,20 @@ from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NA
 import hashlib
 
 from utils.tensor_board_logger import TensorboardLogger
-from training_systems.training_methods import Adversarial, KLAdversarial, KLCoCoOp, BaseCoCoOp
-from training_systems.evaluation_methods import ZeroShotTestStep, FineTunedTestStep, EvalStep
-from utils.clustering import conditional_clustering
+from training_systems.training_methods import (
+    Adversarial,
+    KLAdversarial,
+    KLCoCoOp,
+    BaseCoCoOp,
+)
+from training_systems.evaluation_methods import (
+    ZeroShotTestStep,
+    FineTunedTestStep,
+    EvalStep,
+)
+from utils.clustering import conditional_clustering, random_clustering
+
+
 def checksum(model):
     """
     Generate an MD5 checksum of the model's parameters to track changes across training.
@@ -34,7 +46,9 @@ def checksum(model):
         str: MD5 hash string.
     """
     with torch.no_grad():
-        all_params = torch.cat([p.view(-1).cpu() for p in model.parameters() if p.requires_grad])
+        all_params = torch.cat(
+            [p.view(-1).cpu() for p in model.parameters() if p.requires_grad]
+        )
         return hashlib.md5(all_params.numpy().tobytes()).hexdigest()
 
 
@@ -43,23 +57,24 @@ class CoCoOpSystem:
     Manages the full training process of the CoCoOp model, including configuration, training, evaluation,
     checkpointing, and logging. Supports both base and adversarial training.
     """
+
     def __init__(
-            self,
-            *,
-            test_batch_size=16,
-            device="cuda",
-            run_name="exp1",
-            cnn_model="ViT-B/32",
-            hparams_file,
-            optimizer_configs=None,
-            skip_tests=None,
-            train_base_checkpoint_path=None,
-            debug=False,
-            prompt_learner_opt=None,
-            kl_loss_opt=None,
-            adv_training_opt=None,
-            base_training_opt=None,
-            clustering_opt=None,
+        self,
+        *,
+        test_batch_size=16,
+        device="cuda",
+        run_name="exp1",
+        cnn_model="ViT-B/32",
+        hparams_file,
+        optimizer_configs=None,
+        skip_tests=None,
+        train_base_checkpoint_path=None,
+        debug=False,
+        prompt_learner_opt=None,
+        kl_loss_opt=None,
+        adv_training_opt=None,
+        base_training_opt=None,
+        clustering_opt=None,
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -80,7 +95,9 @@ class CoCoOpSystem:
         assert adv_training_opt is not None, "adv_training_opt must be provided"
         assert base_training_opt is not None, "base_training_opt must be provided"
         assert clustering_opt is not None, "clustering_opt must be provided"
-        assert optimizer_configs is not None and len(optimizer_configs) == 2, "Two optimizer configs must be provided"
+        assert (
+            optimizer_configs is not None and len(optimizer_configs) == 2
+        ), "Two optimizer configs must be provided"
 
         self.test_batch_size = test_batch_size
         self.device = device
@@ -99,7 +116,9 @@ class CoCoOpSystem:
         self.using_kl = kl_loss_opt["using_kl"]
         self.grl_lambda = adv_training_opt["grl_lambda"]
         self.mlp_opt = EasyDict(adv_training_opt["mlp_opt"])
-        self.skip_tests = skip_tests if skip_tests is not None else [False, False, False]
+        self.skip_tests = (
+            skip_tests if skip_tests is not None else [False, False, False]
+        )
         self.train_base_checkpoint_path = train_base_checkpoint_path
         self.debug = debug
         self.max_epoch = self.epochs
@@ -108,31 +127,38 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
 
-        print("BATCH SIZES: ", self.test_batch_size, self.base_batch_size, self.adv_batch_size)
-        
+        print(
+            "BATCH SIZES: ",
+            self.test_batch_size,
+            self.base_batch_size,
+            self.adv_batch_size,
+        )
+
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
 
-        self.logger.log_hparams({
-            "batch_size_test": self.test_batch_size,
-            "base_batch_size": self.base_batch_size,
-            "adv_batch_size": self.adv_batch_size,
-            "epochs": self.epochs,
-            "n_ctx": self.n_ctx,
-            "ctx_init": self.ctx_init,
-            "class_token_position": self.class_token_position,
-            "csc": self.csc,
-            "lambda_kl_first": self.lambda_kl[0],
-            "lambda_kl_second": self.lambda_kl[1],
-            "warmup_epoch": self.warmup_epoch,
-            "warmup_cons_lr": self.warmup_cons_lr,
-            "lambda_adv": self.lambda_adv,
-            "cnn_model": self.cnn_model,
-            "grl_lambda" : self.grl_lambda,
-            "mlp_hidden_dim": self.mlp_opt.hidden_dim,
-            "mlp_hidden_layers": self.mlp_opt.hidden_layers,
-        })
+        self.logger.log_hparams(
+            {
+                "batch_size_test": self.test_batch_size,
+                "base_batch_size": self.base_batch_size,
+                "adv_batch_size": self.adv_batch_size,
+                "epochs": self.epochs,
+                "n_ctx": self.n_ctx,
+                "ctx_init": self.ctx_init,
+                "class_token_position": self.class_token_position,
+                "csc": self.csc,
+                "lambda_kl_first": self.lambda_kl[0],
+                "lambda_kl_second": self.lambda_kl[1],
+                "warmup_epoch": self.warmup_epoch,
+                "warmup_cons_lr": self.warmup_cons_lr,
+                "lambda_adv": self.lambda_adv,
+                "cnn_model": self.cnn_model,
+                "grl_lambda": self.grl_lambda,
+                "mlp_hidden_dim": self.mlp_opt.hidden_dim,
+                "mlp_hidden_layers": self.mlp_opt.hidden_layers,
+            }
+        )
 
         print(self.skip_tests)
         print(self.lambda_kl)
@@ -147,27 +173,44 @@ class CoCoOpSystem:
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
-        # Load clustering information
-        self.cls_cluster_dict, _ = conditional_clustering(
-            n_cluster=clustering_opt["n_clusters"],
-            variance=clustering_opt["variance"],
-            cnn=clustering_opt["vision_encoder"],
-            device=self.device,
-        )
+        if clustering_opt["use_random_clustering"]:
+            # Use random clustering
+            self.cls_cluster_dict, _ = random_clustering(
+                n_cluster=clustering_opt["n_clusters"], seed=clustering_opt["seed"]
+            )
+        else:
+            # Load clustering information
+            self.cls_cluster_dict, _ = conditional_clustering(
+                n_cluster=clustering_opt["n_clusters"],
+                variance=clustering_opt["variance"],
+                cnn=clustering_opt["vision_encoder"],
+                device=self.device,
+            )
 
         resolution = self.clip_model.visual.input_resolution
-        ctx_load = "./bin/coop/exp1_ctx_only.pth" if self.n_ctx == 4 else "./bin/coop/coop_ctx_8.pth"
-        cfg = EasyDict({
-            "TRAINER": {
-                "COCOOP": {"CTX_LOAD": ctx_load, "N_CTX": self.n_ctx, "CTX_INIT": self.ctx_init,
-                           "PREC": "fp16"}},
-            "INPUT": {"SIZE": [resolution, resolution]}
-        })
+        ctx_load = (
+            "./bin/coop/exp1_ctx_only.pth"
+            if self.n_ctx == 4
+            else "./bin/coop/coop_ctx_8.pth"
+        )
+        cfg = EasyDict(
+            {
+                "TRAINER": {
+                    "COCOOP": {
+                        "CTX_LOAD": ctx_load,
+                        "N_CTX": self.n_ctx,
+                        "CTX_INIT": self.ctx_init,
+                        "PREC": "fp16",
+                    }
+                },
+                "INPUT": {"SIZE": [resolution, resolution]},
+            }
+        )
 
         self.model = CustomCLIP(
             classnames=[CLASS_NAMES[idx] for idx in self.base_classes],
             cfg=cfg,
-            clip_model=self.clip_model
+            clip_model=self.clip_model,
         ).to(self.device)
 
         for name, param in self.model.named_parameters():
@@ -180,10 +223,9 @@ class CoCoOpSystem:
         self.grl = GradientReversalLayer(lambda_=self.grl_lambda)
 
         clip_dim = self.clip_model.visual.output_dim
-        self.mlp_adversary = (AdversarialMLP(
-            input_dim=len(self.base_classes)+clip_dim,
-            opt=self.mlp_opt
-        ).to(self.device))
+        self.mlp_adversary = AdversarialMLP(
+            input_dim=len(self.base_classes) + clip_dim, opt=self.mlp_opt
+        ).to(self.device)
 
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
@@ -227,33 +269,41 @@ class CoCoOpSystem:
         Initializes the training method used for both base and adversarial phases, depending on whether KL loss is enabled.
         Chooses between standard and KL-regularized training methods.
         """
-        self.adversarial_method = Adversarial(
-            lambda_adv=0.05,
-            model=self.model,
-            optimizer=self.optimizer,
-            cls_cluster_dict=self.cls_cluster_dict,
-            grl=self.grl,
-            mlp_adversary=self.mlp_adversary,
-            debug=self.debug,
-        ) if not self.using_kl[1] else KLAdversarial(
-            lambda_adv=0.05,
-            model=self.model,
-            optimizer=self.optimizer,
-            cls_cluster_dict=self.cls_cluster_dict,
-            grl=self.grl,
-            mlp_adversary=self.mlp_adversary,
-            lambda_kl=self.lambda_kl[1],
-            debug=self.debug,
+        self.adversarial_method = (
+            Adversarial(
+                lambda_adv=0.05,
+                model=self.model,
+                optimizer=self.optimizer,
+                cls_cluster_dict=self.cls_cluster_dict,
+                grl=self.grl,
+                mlp_adversary=self.mlp_adversary,
+                debug=self.debug,
+            )
+            if not self.using_kl[1]
+            else KLAdversarial(
+                lambda_adv=0.05,
+                model=self.model,
+                optimizer=self.optimizer,
+                cls_cluster_dict=self.cls_cluster_dict,
+                grl=self.grl,
+                mlp_adversary=self.mlp_adversary,
+                lambda_kl=self.lambda_kl[1],
+                debug=self.debug,
+            )
         )
-        self.basic_train_method = BaseCoCoOp(
-            model=self.model,
-            optimizer=self.optimizer,
-            debug=self.debug,
-        ) if not self.using_kl[0] else KLCoCoOp(
-            model=self.model,
-            optimizer=self.optimizer,
-            debug=self.debug,
-            lambda_kl=self.lambda_kl[0],
+        self.basic_train_method = (
+            BaseCoCoOp(
+                model=self.model,
+                optimizer=self.optimizer,
+                debug=self.debug,
+            )
+            if not self.using_kl[0]
+            else KLCoCoOp(
+                model=self.model,
+                optimizer=self.optimizer,
+                debug=self.debug,
+                lambda_kl=self.lambda_kl[0],
+            )
         )
 
     def train(self):
@@ -271,14 +321,21 @@ class CoCoOpSystem:
             if not self.skip_tests[1]:
                 print("Doing base accuracy test")
                 base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
-                self._log_final_metrics("Final metrics - After Base Training", base_acc, novel_acc, base_end_epoch)
+                self._log_final_metrics(
+                    "Final metrics - After Base Training",
+                    base_acc,
+                    novel_acc,
+                    base_end_epoch,
+                )
         else:
             base_end_epoch = 0
             print("Skipping base training")
             # Load the model from the checkpoint
             self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
 
-        self.optimizer = self.get_optimizer(self.model, self.mlp_adversary, self.optimizer_configs[1])
+        self.optimizer = self.get_optimizer(
+            self.model, self.mlp_adversary, self.optimizer_configs[1]
+        )
 
         checksum1 = None
         if self.debug:
@@ -298,7 +355,12 @@ class CoCoOpSystem:
         if not self.skip_tests[2]:
             print("Doing post-adv. accuracy test")
             base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
-            self._log_final_metrics("Final metrics - After Adversarial Training", base_acc, novel_acc, adv_end_epoch)
+            self._log_final_metrics(
+                "Final metrics - After Adversarial Training",
+                base_acc,
+                novel_acc,
+                adv_end_epoch,
+            )
 
         self.logger.close()
         if self.adv_training_epochs != 0:
@@ -343,7 +405,7 @@ class CoCoOpSystem:
                 ce_loss,
                 acc,
                 kl_loss,
-                total_loss
+                total_loss,
             )
 
             base_val_acc, novel_val_acc = self._evaluate_and_log(e)
@@ -395,7 +457,9 @@ class CoCoOpSystem:
 
         for e in range(start_epoch, start_epoch + self.adv_training_epochs):
             progress = (e - start_epoch + 1) / warmup_epochs
-            new_lambda_adv = initial_lambda_adv + (lambda_adv_max - initial_lambda_adv) * min(progress, 1)
+            new_lambda_adv = initial_lambda_adv + (
+                lambda_adv_max - initial_lambda_adv
+            ) * min(progress, 1)
 
             method.update_lambda_adv(new_lambda_adv)
 
@@ -418,7 +482,7 @@ class CoCoOpSystem:
                 acc,
                 adv_loss,
                 ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
-                kl_loss=kl_loss
+                kl_loss=kl_loss,
             )
 
             last_model_state = deepcopy(self.model.state_dict())
@@ -453,7 +517,9 @@ class CoCoOpSystem:
             print("Loaded best model from adversarial checkpoint.")
 
         else:
-            print("No improvement during second training. Using model from last adversarial epoch.")
+            print(
+                "No improvement during second training. Using model from last adversarial epoch."
+            )
             if last_model_state is not None:
                 self.model.load_state_dict(last_model_state)
                 print("Loaded last adversarial model state.")
@@ -481,12 +547,19 @@ class CoCoOpSystem:
         metrics_novel = self.eval_method.evaluate(
             dataset=self.val_novel,
             new_classnames=self.novel_classes,
-            desc_add=" - Novel"
+            desc_add=" - Novel",
         )
         novel_val_loss = metrics_novel["loss"]
         novel_val_acc = metrics_novel["accuracy"]
 
-        self.logger.log_validation(epoch, base_val_loss, base_val_acc, novel_val_loss, novel_val_acc, is_adv=is_adv)
+        self.logger.log_validation(
+            epoch,
+            base_val_loss,
+            base_val_acc,
+            novel_val_loss,
+            novel_val_acc,
+            is_adv=is_adv,
+        )
 
         return base_val_acc, novel_val_acc
 
@@ -514,7 +587,14 @@ class CoCoOpSystem:
         """
         if current_epoch < self.warmup_epoch:
             return self.warmup_cons_lr / self.optimizer_configs[0].prompt_lr
-        return 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epoch) / (self.max_epoch - self.warmup_epoch + 1e-7)))
+        return 0.5 * (
+            1
+            + math.cos(
+                math.pi
+                * (current_epoch - self.warmup_epoch)
+                / (self.max_epoch - self.warmup_epoch + 1e-7)
+            )
+        )
 
     def compute_evaluation(self, epoch_idx, base=False):
         """
@@ -529,7 +609,8 @@ class CoCoOpSystem:
 
         model = self.model if not base else self.clip_model
         base_accuracy = test_step(model, self.test_base, self.base_classes, self.batch_size, self.device, label="test", base=base)
-        novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)"""
+        novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
+        """
         if base:
             base_metrics = self.zero_shot_base_classes_test_method.evaluate(
                 dataset=self.test_base,
@@ -566,7 +647,9 @@ class CoCoOpSystem:
             prefix (str): Filename prefix to distinguish models.
         """
         os.makedirs(path, exist_ok=True)
-        torch.save(self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth"))
+        torch.save(
+            self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
+        )
 
     def get_optimizer(self, model, mlp_adversary, config):
         """
@@ -582,13 +665,21 @@ class CoCoOpSystem:
         """
         params = [
             {
-                "params": [p for n, p in model.named_parameters() if "prompt_learner" in n and p.requires_grad],
+                "params": [
+                    p
+                    for n, p in model.named_parameters()
+                    if "prompt_learner" in n and p.requires_grad
+                ],
                 "lr": config.prompt_lr,
             }
         ]
         if mlp_adversary is not None:
-            params.append({
-                "params": mlp_adversary.parameters(),
-                "lr": config.mlp_lr,
-            })
-        return torch.optim.SGD(params, weight_decay=config.weight_decay, momentum=config.momentum)
+            params.append(
+                {
+                    "params": mlp_adversary.parameters(),
+                    "lr": config.mlp_lr,
+                }
+            )
+        return torch.optim.SGD(
+            params, weight_decay=config.weight_decay, momentum=config.momentum
+        )
