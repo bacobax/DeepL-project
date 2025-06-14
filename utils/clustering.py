@@ -88,6 +88,7 @@ def random_clustering(
     n_cluster,
     seed=42,
     data_dir="../data",
+    distribution="uniform",
 ):
     """
     Generates random cluster assignments for a given number of clusters.
@@ -96,6 +97,7 @@ def random_clustering(
         n_cluster (int): Number of clusters to generate.
         seed (int): Random seed for reproducibility.
         data_dir (str): Directory where the dataset is stored.
+        distribution (str): Distribution type for cluster assignment. Options are "uniform", "random", or "sequential".
     Returns:
         Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
     """
@@ -106,8 +108,22 @@ def random_clustering(
 
     # split train_base into n_cluster clusters
     cluster_labels = {}
-    for i, c in enumerate(base_classes):
-        cluster_labels[c] = np.random.randint(0, n_cluster)
+    if distribution == "uniform":
+        shuffled = np.random.permutation(base_classes)
+
+        for i, cls in enumerate(shuffled):
+            cluster_labels[cls] = i % n_cluster
+    elif distribution == "random":
+        cluster_labels = {
+            base_class: np.random.choice(range(n_cluster))
+            for base_class in base_classes
+        }
+    elif distribution == "sequential":
+        cluster_labels = {
+            base_class: i % n_cluster for i, base_class in enumerate(base_classes)
+        }
+    else:
+        raise ValueError(f"Unknown distribution: {distribution}")
 
     cluster_labels_text = {
         CLASS_NAMES[base_class]: int(cluster)

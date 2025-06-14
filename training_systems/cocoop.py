@@ -176,7 +176,9 @@ class CoCoOpSystem:
         if clustering_opt["use_random_clustering"]:
             # Use random clustering
             self.cls_cluster_dict, _ = random_clustering(
-                n_cluster=clustering_opt["n_clusters"], seed=clustering_opt["seed"]
+                n_cluster=clustering_opt["n_clusters"],
+                seed=clustering_opt["seed"],
+                distribution="uniform",
             )
         else:
             # Load clustering information
