@@ -417,9 +417,9 @@ class CoCoOpSystem:
                 torch.save(self.model.state_dict(), best_model_path)
             else:
                 patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"Early stopping at epoch {e}")
-                    break
+                # if patience_counter >= patience:
+                #     print(f"Early stopping at epoch {e}")
+                #     break
             self.lr_scheduler.step()
             pbar.set_postfix(
                 ce_loss=ce_loss,
@@ -501,9 +501,9 @@ class CoCoOpSystem:
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"Early stopping adversarial at epoch {e}")
-                    break
+            #     if patience_counter >= patience:
+            #         print(f"Early stopping adversarial at epoch {e}")
+            #         break
             pbar.set_postfix(
                 ce_loss=ce_loss,
                 kl_loss=kl_loss,
