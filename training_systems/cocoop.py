@@ -232,12 +232,6 @@ class CoCoOpSystem:
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
-        self._set_train_methods()
-
-        self._set_eval_method()
-
-        self._set_test_methods()
-
     def _set_test_methods(self):
         """
         Initializes the zero-shot and fine-tuned test step evaluators for both base and novel class splits.
@@ -313,6 +307,10 @@ class CoCoOpSystem:
         Execute the full training pipeline: base phase, optionally followed by adversarial training and evaluation.
         """
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+        # Ensure all methods are properly initialized prior to the base training phase
+        self._set_eval_method()
+        self._set_test_methods()
+        self._set_train_methods()
         if self.train_base_checkpoint_path is None:
             # Base training phase
             base_end_epoch, _ = self._train_base_phase(best_model_path)
@@ -335,9 +333,15 @@ class CoCoOpSystem:
             # Load the model from the checkpoint
             self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
 
+        # Re-initialize test/eval/train methods after loading/training model and before adversarial phase
+        self._set_eval_method()
+        self._set_test_methods()
+
         self.optimizer = self.get_optimizer(
             self.model, self.mlp_adversary, self.optimizer_configs[1]
         )
+        # After changing optimizer, ensure train methods use the new optimizer
+        self._set_train_methods()
 
         checksum1 = None
         if self.debug:

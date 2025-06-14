@@ -34,7 +34,7 @@ cocoop:
     batch_size: 10
     warmup_lambda_adv: 5
     adv_training_epochs: 10
-    lambda_adv: 0.3
+    lambda_adv: 0.4
     grl_lambda: 5
     mlp_opt:
       hidden_dim: 592
