@@ -45,7 +45,13 @@ class AdversarialMLP(nn.Module):
             nn.Sigmoid(),
         )
 
-
+        self.model.apply(self.init_weights)
 
     def forward(self, x):
         return self.model(x)
+
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
