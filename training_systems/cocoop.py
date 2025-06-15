@@ -126,6 +126,7 @@ class CoCoOpSystem:
         self.warmup_lambda_adv = adv_training_opt["warmup_lambda_adv"]
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
+        self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
 
         print(
             "BATCH SIZES: ",
@@ -157,6 +158,7 @@ class CoCoOpSystem:
                 "grl_lambda": self.grl_lambda,
                 "mlp_hidden_dim": self.mlp_opt.hidden_dim,
                 "mlp_hidden_layers": self.mlp_opt.hidden_layers,
+                "prompt_learner_warmup_epochs" : self.prompt_learner_warmup_epochs,
             }
         )
 
@@ -468,6 +470,15 @@ class CoCoOpSystem:
             ) * min(progress, 1)
 
             method.update_lambda_adv(new_lambda_adv)
+
+            if (e-start_epoch) < self.prompt_learner_warmup_epochs:
+                for name, param in self.model.named_parameters():
+                    if "prompt_learner" in name:
+                        param.requires_grad_(False)
+            elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
+                for name, param in self.model.named_parameters():
+                    if "prompt_learner" in name:
+                        param.requires_grad_(True)
 
             if self.using_kl[1]:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
