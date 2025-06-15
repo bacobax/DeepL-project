@@ -21,7 +21,7 @@ RUN_PREFIX="from_yaml"
 #  "cocoop_kl"
 #)
 HPARAMS_CONF=(
-  "all_adv_8_ctx_new
+  "all_adv_8_ctx_new"
 )
   DEBUG="true"
 
