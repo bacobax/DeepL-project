@@ -12,8 +12,11 @@ LOG_DIR=logs
 DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
-HPARAMS_CONFS=("base_no_kl_adv_no_kl_8_ctx" "base_kl_adv_no_kl_8_ctx" "all_adv_training_8_ctx" "all_adv_training_8_ctx_base_cluster_RN50")  # Add your .yaml config names without extension
-DEBUG="true"
+HPARAMS_CONFS=(
+  "base_kl_adv_no_kl_8_ctx"
+  "all_adv_8_ctx" 
+)
+  DEBUG="true"
 
 # This will be set inside the loop
 HPARAMS_DIR="hparams_configs"
@@ -28,16 +31,16 @@ mkdir -p $LOG_DIR
 
 # === Run training ===
 for HPARAMS_CONF in "${HPARAMS_CONFS[@]}"; do
-  HPARAMS_FULL_PATH="$HPARAMS_DIR/$HPARAMS_CONF.yaml"
-  RUN_NAME="${RUN_PREFIX}_${HPARAMS_CONF}_$(date +"%Y%m%d_%H%M%S")"
-
-  echo "Starting training on $DEVICE with config $HPARAMS_CONF..."
-  if python $PYTHON_SCRIPT --debug $DEBUG --config $HPARAMS_FULL_PATH --device $DEVICE --run_name $RUN_NAME --using_coop $USING_COOP | tee $LOG_DIR/train_${HPARAMS_CONF}_$(date +"%Y%m%d_%H%M%S").log; then
-    # Git operations
-    cd "runs/CoCoOp/"
-    git add "$RUN_NAME"
-    git commit -m "Add logs for $RUN_NAME"
-    git push
-    cd ../..
-  fi
+    HPARAMS_FULL_PATH="$HPARAMS_DIR/$HPARAMS_CONF.yaml"
+    RUN_NAME="${RUN_PREFIX}_${HPARAMS_CONF}_$(date +"%Y%m%d_%H%M%S")"
+    
+    echo "Starting training on $DEVICE with config $HPARAMS_CONF..."
+    if python $PYTHON_SCRIPT --debug $DEBUG --config $HPARAMS_FULL_PATH --device $DEVICE --run_name $RUN_NAME --using_coop $USING_COOP | tee $LOG_DIR/train_${HPARAMS_CONF}_$(date +"%Y%m%d_%H%M%S").log; then
+        # Git operations
+        cd "runs/CoCoOp/"
+        git add "$RUN_NAME"
+        git commit -m "Add logs for $RUN_NAME"
+        git push
+        cd ../..
+    fi
 done
