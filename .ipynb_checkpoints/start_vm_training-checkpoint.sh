@@ -15,7 +15,7 @@ RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
   "all_adv_8_ctx_new"  
 )
-DEBUG="true"
+DEBUG="false"
 
 # This will be set inside the loop
 HPARAMS_DIR="hparams_configs"
