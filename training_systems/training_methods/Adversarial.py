@@ -114,7 +114,7 @@ class Adversarial(TrainingMethod):
 
         # Forward pass + loss computation dsada
         logits, ce_loss, img_features, ctx_shifted = self.model(inputs, targets, get_image_features=True)
-        ctx_flat = ctx_shifted.reshape(ctx_shifted.size(0), -1)
+        ctx_flat = ctx_shifted.reshape(ctx_shifted.size(0), -1).to(dtype=torch.float32)
 
         #concat = torch.cat([img_features, logits], dim=1).to(dtype=torch.float32)
         # === Adversarial loss ===
