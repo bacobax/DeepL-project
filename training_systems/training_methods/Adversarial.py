@@ -121,9 +121,13 @@ class Adversarial(TrainingMethod):
         cluster_logits = self.mlp_adversary(reversed_logits).squeeze()
 
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
+        # Skip adversarial update if prompt learner is frozen
+        if any(p.requires_grad for p in self.model.prompt_learner.parameters()):
+            ce_grads = self.get_grads(ce_loss)
+        else:
+            ce_grads = None  # Or torch.zeros_like(...), depending on downstream use
 
         if batch_idx < 3 and self.debug:
-            ce_grads = self.get_grads(ce_loss)
             bce_grads = self.get_grads(loss_bce)
             self.print_grads_norms(bce_grads, ce_grads)
 
