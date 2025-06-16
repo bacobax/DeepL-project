@@ -502,32 +502,37 @@ class CoCoOpSystem:
                 ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
                 kl_loss=kl_loss,
             )
+            if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
 
-            last_model_state = deepcopy(self.model.state_dict())
+                last_model_state = deepcopy(self.model.state_dict())
 
-            base_val_acc, novel_val_acc = self._evaluate_and_log(
-                e,
-                is_adv=True,
-            )
-
-            if novel_val_acc > best_novel_accuracy:
-                best_novel_accuracy = novel_val_acc
-                torch.save(self.model.state_dict(), best_model_path)
-                at_least_one_improving = True
-                patience_counter = 0
+                base_val_acc, novel_val_acc = self._evaluate_and_log(
+                    e,
+                    is_adv=True,
+                )
+                if novel_val_acc > best_novel_accuracy:
+                    best_novel_accuracy = novel_val_acc
+                    torch.save(self.model.state_dict(), best_model_path)
+                    at_least_one_improving = True
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+                #     if patience_counter >= patience:
+                #         print(f"Early stopping adversarial at epoch {e}")
+                #         break
+                pbar.set_postfix(
+                    ce_loss=ce_loss,
+                    kl_loss=kl_loss,
+                    adv_loss=adv_loss,
+                    base_val_acc=base_val_acc,
+                    lr=self.optimizer.param_groups[0]["lr"],
+                    pat_c=patience_counter,
+                )
             else:
-                patience_counter += 1
-            #     if patience_counter >= patience:
-            #         print(f"Early stopping adversarial at epoch {e}")
-            #         break
-            pbar.set_postfix(
-                ce_loss=ce_loss,
-                kl_loss=kl_loss,
-                adv_loss=adv_loss,
-                base_val_acc=base_val_acc,
-                lr=self.optimizer.param_groups[0]["lr"],
-                pat_c=patience_counter,
-            )
+
+                pbar.set_postfix(
+                    adv_loss=adv_loss,
+                )
             pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:

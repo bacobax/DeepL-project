@@ -32,10 +32,10 @@ cocoop:
     using_kl: [true, false]
   adv_training_opt:
     batch_size: 10
-    warmup_lambda_adv: 5
-    adv_training_epochs: 15
-    lambda_adv: 1
-    grl_lambda: 5
+    warmup_lambda_adv: 6
+    adv_training_epochs: 10
+    lambda_adv: 0.4
+    grl_lambda: 1
     mlp_opt:
       hidden_dim: 592
       hidden_layers: 3
