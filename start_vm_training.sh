@@ -12,18 +12,10 @@ LOG_DIR=logs
 DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
-#HPARAMS_CONFS=(
-#  "base_kl_adv_no_kl_8_ctx"
-#  "base_kl_adv_no_kl_8_ctx_randomCluster"
-#  "base_no_kl_adv_no_kl_8_ctx"
-#  "base_no_kl_adv_no_kl_8_ctx_randomCluster"
-#  "cocoop_base"
-#  "cocoop_kl"
-#)
-HPARAMS_CONF=(
-  "all_adv_8_ctx_new"
+HPARAMS_CONFS=(
+  "all_adv_8_ctx_new"  
 )
-  DEBUG="true"
+DEBUG="true"
 
 # This will be set inside the loop
 HPARAMS_DIR="hparams_configs"
