@@ -227,8 +227,9 @@ class CoCoOpSystem:
         self.grl = GradientReversalLayer(lambda_=self.grl_lambda)
 
         clip_dim = self.clip_model.visual.output_dim
+        print(f"ctx_dim: {self.clip_model.ln_final.weight.shape[0]}, ")
         self.mlp_adversary = AdversarialMLP(
-            input_dim=len(self.base_classes) + clip_dim, opt=self.mlp_opt
+            input_dim=self.clip_model.ln_final.weight.shape[0] * self.n_ctx, opt=self.mlp_opt
         ).to(self.device)
 
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
