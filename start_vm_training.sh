@@ -14,6 +14,7 @@ USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
   "all_adv_8_ctx"
+  "all_adv_8_ctx_2s"
   "base_kl_adv_no_kl_8_ctx"
 )
 DEBUG="false"
