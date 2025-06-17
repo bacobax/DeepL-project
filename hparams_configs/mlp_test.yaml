@@ -37,7 +37,7 @@ cocoop:
     lambda_adv: 1
     grl_lambda: 1
     mlp_opt:
-      hidden_structure: [512, 256, 128]
+      hidden_structure: [563, 256, 128]
     prompt_learner_warmup_epochs: 21
   base_training_opt:
     epochs: 0

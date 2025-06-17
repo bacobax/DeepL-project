@@ -230,7 +230,7 @@ class CoCoOpSystem:
             input_dim=self.clip_model.ln_final.weight.shape[0] * self.n_ctx, opt=self.mlp_opt
         ).to(self.device)"""
         self.mlp_adversary = AdversarialMLP(
-            input_dim=clip_dim, opt=self.mlp_opt
+            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt
         ).to(self.device)
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
