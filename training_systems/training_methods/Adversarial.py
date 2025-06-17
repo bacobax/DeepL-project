@@ -113,7 +113,9 @@ class Adversarial(TrainingMethod):
         )
 
         # Forward pass + loss computation dsada
-        logits, ce_loss, img_features, ctx_shifted = self.model(inputs, targets, get_image_features=True)
+        logits, ce_loss, img_features, ctx, bias = self.model(inputs, targets, get_image_features=True)
+        ctx = ctx.detach()  # Detach context to avoid backprop through it
+        ctx_shifted = ctx + bias.unsqueeze(1)  # Add bias to context tokens
         ctx_flat = ctx_shifted.reshape(ctx_shifted.size(0), -1).to(dtype=torch.float32)
 
         #concat = torch.cat([img_features, logits], dim=1).to(dtype=torch.float32)

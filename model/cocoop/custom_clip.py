@@ -104,7 +104,7 @@ class CustomCLIP(nn.Module):
 
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
-        prompts, ctx_shifted = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
+        prompts, ctx, bias = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
         if prompts.isnan().any():
             raise ValueError("NaN detected in prompts.")
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
@@ -137,7 +137,7 @@ class CustomCLIP(nn.Module):
             # logits: [B, num_classes], label: [B]
             if get_image_features:
                 # If get_image_features is True, return logits and image features
-                return logits, F.cross_entropy(logits, label), image_features, ctx_shifted
+                return logits, F.cross_entropy(logits, label), image_features, ctx, bias
             else:
                 return logits, F.cross_entropy(logits, label)
 
