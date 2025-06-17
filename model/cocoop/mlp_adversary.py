@@ -42,7 +42,6 @@ class AdversarialMLP(nn.Module):
                 for _ in range(hidden_layers - 1)
             ],
             nn.Linear(hidden_dim, 1),
-            nn.Sigmoid(),
         )
 
         self.model.apply(self.init_weights.__get__(self, AdversarialMLP))
