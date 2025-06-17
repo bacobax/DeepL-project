@@ -37,9 +37,8 @@ cocoop:
     lambda_adv: 0.5
     grl_lambda: 1
     mlp_opt:
-      hidden_dim: 592
-      hidden_layers: 3
-    prompt_learner_warmup_epochs: 0
+      hidden_structure: [2368, 1024, 512, 256, 128]
+    prompt_learner_warmup_epochs: 11
   base_training_opt:
     epochs: 0
     batch_size: 10
@@ -48,6 +47,6 @@ cocoop:
   clustering_opt:
     n_clusters: 2
     variance: 0.95
-    vision_encoder: "ViT-B/32"
+    vision_encoder: "RN50"
     method: "kmeans"
     use_random_clustering: false
