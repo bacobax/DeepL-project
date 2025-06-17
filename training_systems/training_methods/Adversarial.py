@@ -120,7 +120,7 @@ class Adversarial(TrainingMethod):
 
         #concat = torch.cat([avg_txt_features, logits], dim=1).to(dtype=torch.float32)
         # === Adversarial loss ===
-        reversed_logits = self.grl(avg_txt_features)
+        reversed_logits = self.grl(avg_txt_features.to(dtype=torch.float32))
         cluster_logits = self.mlp_adversary(reversed_logits).squeeze()
 
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
