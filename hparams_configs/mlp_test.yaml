@@ -17,7 +17,7 @@ cocoop:
       weight_decay: 0.0001
       momentum: 0.9
     - prompt_lr: 0.002
-      mlp_lr: 0.002
+      mlp_lr: 0.004
       weight_decay: 0.0005
       momentum: 0.8
   skip_tests: [true, true, false]
@@ -31,14 +31,14 @@ cocoop:
     lambda_kl: [0.1, 0.1]
     using_kl: [true, false]
   adv_training_opt:
-    adv_training_epochs: 10
+    adv_training_epochs: 20
     batch_size: 10
-    warmup_lambda_adv: 6
-    lambda_adv: 0.5
+    warmup_lambda_adv: 1
+    lambda_adv: 1
     grl_lambda: 1
     mlp_opt:
-      hidden_structure: [2368, 1024, 512, 256, 128]
-    prompt_learner_warmup_epochs: 11
+      hidden_structure: [4096, 1024, 512]
+    prompt_learner_warmup_epochs: 21
   base_training_opt:
     epochs: 0
     batch_size: 10
@@ -47,6 +47,6 @@ cocoop:
   clustering_opt:
     n_clusters: 2
     variance: 0.95
-    vision_encoder: "RN50"
+    vision_encoder: "ViT-B/32"
     method: "kmeans"
     use_random_clustering: false

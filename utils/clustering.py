@@ -9,7 +9,7 @@ import os
 import pickle
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_distances
-
+from collections import Counter
 
 def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../data"):
     """
@@ -177,6 +177,10 @@ def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data")
             pickle.dump(cluster_labels, f)
         with open(text_categories_path, "wb") as f:
             pickle.dump(cluster_labels_text, f)
+    # Count samples in each cluster
+    cluster_counts = Counter(cluster_dict_int.values())
+    for cluster_id in range(n_cluster):
+        print(f"Cluster {cluster_id} count: {cluster_counts.get(cluster_id, 0)}")
 
     return cluster_dict_int, cluster_labels_text
 

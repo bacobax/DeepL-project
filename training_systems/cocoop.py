@@ -156,8 +156,6 @@ class CoCoOpSystem:
                 "lambda_adv": self.lambda_adv,
                 "cnn_model": self.cnn_model,
                 "grl_lambda": self.grl_lambda,
-                "mlp_hidden_dim": self.mlp_opt.hidden_dim,
-                "mlp_hidden_layers": self.mlp_opt.hidden_layers,
                 "prompt_learner_warmup_epochs" : self.prompt_learner_warmup_epochs,
             }
         )
@@ -231,7 +229,7 @@ class CoCoOpSystem:
         self.mlp_adversary = AdversarialMLP(
             input_dim=self.clip_model.ln_final.weight.shape[0] * self.n_ctx, opt=self.mlp_opt
         ).to(self.device)
-
+        print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
