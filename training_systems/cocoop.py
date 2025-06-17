@@ -127,7 +127,6 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
-        self.only_mlp = only_mlp
 
         print(
             "BATCH SIZES: ",
@@ -227,8 +226,11 @@ class CoCoOpSystem:
 
         clip_dim = self.clip_model.visual.output_dim
         print(f"ctx_dim: {self.clip_model.ln_final.weight.shape[0]}, ")
-        self.mlp_adversary = AdversarialMLP(
+        """self.mlp_adversary = AdversarialMLP(
             input_dim=self.clip_model.ln_final.weight.shape[0] * self.n_ctx, opt=self.mlp_opt
+        ).to(self.device)"""
+        self.mlp_adversary = AdversarialMLP(
+            input_dim=clip_dim, opt=self.mlp_opt
         ).to(self.device)
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])

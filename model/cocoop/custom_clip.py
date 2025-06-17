@@ -109,6 +109,7 @@ class CustomCLIP(nn.Module):
             raise ValueError("NaN detected in prompts.")
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
+        all_text_features = []
         # Iterate over batch
         for pts_i, imf_i in zip(prompts, image_features):
             # pts_i: [num_classes, context_length, D]
@@ -117,6 +118,7 @@ class CustomCLIP(nn.Module):
             text_features = self.text_encoder(pts_i, tokenized_prompts)
             if text_features.isnan().any():
                 raise ValueError("NaN detected in text ft.")
+            all_text_features.append(text_features)
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
@@ -125,6 +127,10 @@ class CustomCLIP(nn.Module):
             l_i = logit_scale * imf_i @ text_features.t()
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
+
+        all_text_features = torch.stack(all_text_features)  # [B, num_classes, D]
+        #avarage over num_classes
+        avg_text_features = all_text_features.mean(dim=1)
 
         # logits: list of B tensors each of shape [num_classes]
         # stacked into a tensor of shape [B, num_classes]
@@ -137,7 +143,7 @@ class CustomCLIP(nn.Module):
             # logits: [B, num_classes], label: [B]
             if get_image_features:
                 # If get_image_features is True, return logits and image features
-                return logits, F.cross_entropy(logits, label), image_features, ctx, bias
+                return logits, F.cross_entropy(logits, label), image_features, ctx, bias, avg_text_features
             else:
                 return logits, F.cross_entropy(logits, label)
 
