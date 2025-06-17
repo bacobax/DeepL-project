@@ -127,6 +127,7 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
+        self.only_mlp = only_mlp
 
         print(
             "BATCH SIZES: ",
@@ -372,6 +373,7 @@ class CoCoOpSystem:
         self.logger.close()
         if self.adv_training_epochs != 0:
             self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
+            self.save_mlp_adversary()
 
     def _train_base_phase(self, best_model_path):
         """
@@ -670,6 +672,20 @@ class CoCoOpSystem:
         os.makedirs(path, exist_ok=True)
         torch.save(
             self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
+        )
+
+    def save_mlp_adversary(self, path="./bin/cocoop", prefix=""):
+        """
+        Save the MLP adversary weights to disk.
+
+        Args:
+            path (str): Directory to save the MLP adversary model to.
+            prefix (str): Filename prefix to distinguish models.
+        """
+        os.makedirs(path, exist_ok=True)
+        torch.save(
+            self.mlp_adversary.state_dict(),
+            os.path.join(path, f"{prefix}{self.run_name}_mlp_adversary.pth"),
         )
 
     def get_optimizer(self, model, mlp_adversary, config):
