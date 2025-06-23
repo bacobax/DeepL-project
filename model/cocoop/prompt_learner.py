@@ -143,4 +143,4 @@ class PromptLearner(nn.Module):
             prompts.append(pts_i)
         prompts = torch.stack(prompts)
 
-        return prompts
+        return prompts, ctx, bias

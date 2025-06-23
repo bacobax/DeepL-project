@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.cuda.amp import GradScaler, autocast
 from model.cocoop.prompt_learner import PromptLearner
+from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from easydict import EasyDict
@@ -23,6 +24,7 @@ class TextEncoder(nn.Module):
         self.ln_final = clip_model.ln_final
         self.text_projection = clip_model.text_projection
         self.dtype = clip_model.dtype
+        print(f"self.dtype={self.dtype}")
 
     def forward(self, prompts, tokenized_prompts):
         x = prompts + self.positional_embedding.type(self.dtype)
@@ -49,6 +51,8 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
         self.clip_model = clip_model
         self.cfg = cfg
+
+
 
     @contextmanager
     def temporary_classnames(self, new_classnames):
@@ -82,7 +86,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.n_cls = original_classnames
 
 
-    def forward(self, image, label=None):
+    def forward(self, image, label=None, get_image_features=False):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 
@@ -91,6 +95,7 @@ class CustomCLIP(nn.Module):
 
         # image: [B, 3, H, W]
         # image_features: [B, D] where D = transformer width (e.g., 512 for ViT-B/32)
+        #print(f"image device: {image.device} | image encoder device: {next(self.image_encoder.parameters()).device}")
         image_features = self.image_encoder(image.type(self.dtype))
         if image_features.isnan().any():
             raise ValueError("NaN detected in image_features.")
@@ -99,11 +104,12 @@ class CustomCLIP(nn.Module):
 
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
-        prompts = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
+        prompts, ctx, bias = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]
         if prompts.isnan().any():
             raise ValueError("NaN detected in prompts.")
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
+        all_text_features = []
         # Iterate over batch
         for pts_i, imf_i in zip(prompts, image_features):
             # pts_i: [num_classes, context_length, D]
@@ -112,6 +118,7 @@ class CustomCLIP(nn.Module):
             text_features = self.text_encoder(pts_i, tokenized_prompts)
             if text_features.isnan().any():
                 raise ValueError("NaN detected in text ft.")
+            all_text_features.append(text_features)
             # Normalize text features
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
@@ -121,16 +128,24 @@ class CustomCLIP(nn.Module):
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
 
+        all_text_features = torch.stack(all_text_features)  # [B, num_classes, D]
+        #avarage over num_classes
+        avg_text_features = all_text_features.mean(dim=1)
+
         # logits: list of B tensors each of shape [num_classes]
         # stacked into a tensor of shape [B, num_classes]
         logits = torch.stack(logits)
         if logits.isnan().any():
             raise ValueError("NaN detected in logits")
+
         # If in training mode, compute and return cross-entropy loss
         if self.prompt_learner.training:
             # logits: [B, num_classes], label: [B]
-
-            return logits, F.cross_entropy(logits, label)
+            if get_image_features:
+                # If get_image_features is True, return logits and image features
+                return logits, F.cross_entropy(logits, label), image_features, ctx, bias, avg_text_features
+            else:
+                return logits, F.cross_entropy(logits, label)
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits

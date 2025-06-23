@@ -1,35 +1,59 @@
+import yaml
+import argparse
+
 from training_systems.cocoop import CoCoOpSystem
 from training_systems.coop import CoOpSystem
 import torch
 import os
 from datetime import datetime
+import pickle
+from collections import Counter
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', default=os.getenv("DEVICE", "cuda:0"))
+    parser.add_argument('--run_name', default=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    parser.add_argument('--using_coop', default=False, type=lambda x: x.lower() in ("1", "true", "yes", "true"))
+    parser.add_argument('--config', default="train_config.yaml")
+    parser.add_argument('--debug', default=True, type=lambda x: x.lower() in ("1", "true", "yes", "true"))
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    #take the device name from DEVICE env variable
-    device = os.getenv("DEVICE", "cuda:0")
+    args = parse_args()
+
+    device = args.device
+    run_name = args.run_name
+    debug = args.debug
+    use_coop = args.using_coop
+
     print(f"Using device: {device}")
 
     if torch.backends.mps.is_available():
-        print("⚠️ Forcing float32 due to MPS limitations")
+        print("\u26a0\ufe0f Forcing float32 due to MPS limitations")
         torch.set_default_dtype(torch.float32)
-
-    use_coop = os.getenv("USING_COOP", "false").lower() in ("1", "true")
 
     print(f"Using {'CoOp' if use_coop else 'CoCoOp'} for training")
 
-    train_cls = CoOpSystem if use_coop else CoCoOpSystem
+    # Load hyperparameters from YAML
+    with open(args.config, "r") as file:
+        config = yaml.safe_load(file)
 
-    train_sys = train_cls(
-        batch_size=16,
-        device=device,
-        learning_rate=5e-4,
-        weight_decay=0.0001,
-        momentum=0.9,
-        epochs=30,
-        run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        n_ctx=4,
-        ctx_init="",
-        class_token_position="end",
-        csc=False,
-    )
-    
+    if use_coop:
+        coop_cfg = config['coop']
+        train_sys = CoOpSystem(
+            device=device,
+            run_name=run_name,
+            **coop_cfg
+        )
+    else:
+        cocoop_cfg = config['cocoop']
+        train_sys = CoCoOpSystem(
+            device=device,
+            run_name=run_name,
+            debug=debug,
+            **cocoop_cfg
+        )
+
     train_sys.train()

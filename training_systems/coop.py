@@ -1,3 +1,8 @@
+"""
+This module defines the CoOpSystem class for training and evaluating a prompt-tuned CLIP model using the CoOp method.
+It includes data loading, training with early stopping, evaluation, model saving/loading, and logging to TensorBoard.
+"""
+
 import os
 
 import torch
@@ -14,6 +19,22 @@ from torch import nn
 
 
 class CoOpSystem:
+    """
+    Implements the CoOp prompt tuning system for training and evaluating CLIP-based models.
+
+    Attributes:
+        batch_size (int): Number of samples per training batch.
+        device (str): Device identifier (e.g., "cuda:0") to run training on.
+        learning_rate (float): Learning rate for the optimizer.
+        weight_decay (float): Weight decay used in the optimizer.
+        momentum (float): Momentum term (if applicable).
+        epochs (int): Number of training epochs.
+        run_name (str): Identifier for the experiment run (used for logging and file naming).
+        n_ctx (int): Number of context tokens for prompt tuning.
+        ctx_init (str): Initialization string for context tokens.
+        class_token_position (str): Position of the class token in the prompt.
+        csc (bool): Whether to use class-specific context.
+    """
     def __init__(self,
                  batch_size=16,
                  device="cuda:0",
@@ -93,16 +114,20 @@ class CoOpSystem:
         self.cost_function = nn.CrossEntropyLoss()
 
     def train(self):
+        """
+        Trains the CoOp model on the base classes with early stopping and logs performance metrics.
+        Saves the best model and computes evaluation at the end of training.
+        """
         print("Before training:")
         print("Training the model...")
         print_epoch_interval = 2
         pbar = tqdm(total=self.epochs, desc="OVERALL TRAINING", position=0, leave=True)
-    
+
         best_val_acc = 0.0
         patience = 5
         counter = 0
         best_model_state = None
-    
+
         for e in range(self.epochs):
             base_train_loss, base_train_accuracy = training_step(
                 model=self.model,
@@ -111,7 +136,7 @@ class CoOpSystem:
                 batch_size=self.batch_size,
                 device=self.device,
             )
-    
+
             if e % print_epoch_interval == 0:
                 base_val_loss, base_val_accuracy = eval_step(
                     model=self.model,
@@ -120,12 +145,12 @@ class CoOpSystem:
                     device=self.device,
                     batch_size=self.batch_size,
                 )
-    
+
                 self.log_values(e, base_train_loss, base_train_accuracy, "train_base")
                 self.log_values(e, base_val_loss, base_val_accuracy, "validation_base")
-    
+
                 pbar.set_postfix(train_acc=base_train_accuracy, val_acc=base_val_accuracy)
-    
+
                 # Early stopping check
                 if base_val_accuracy > best_val_acc:
                     best_val_acc = base_val_accuracy
@@ -136,21 +161,27 @@ class CoOpSystem:
                     if counter >= patience:
                         print(f"Early stopping at epoch {e}, best validation accuracy: {best_val_acc:.4f}")
                         break
-    
+
             pbar.update(1)
-    
+
         # Restore best model if early stopped
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
-    
+
         print("After training:")
         self.compute_evaluation(self.epochs)
         self.writer.close()
-    
+
         self.save_model()
         self.save_prompt_learner()
 
     def save_model(self, path="./bin/coop"):
+        """
+        Saves the entire model's state dictionary to disk under the specified path.
+
+        Args:
+            path (str): Directory path where the model checkpoint will be saved.
+        """
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
@@ -158,6 +189,12 @@ class CoOpSystem:
         torch.save(self.model.state_dict(), os.path.join(path, f"{self.run_name}.pth"))
 
     def save_prompt_learner(self, path="./bin/coop"):
+        """
+        Saves only the prompt learner component of the model to disk.
+
+        Args:
+            path (str): Directory path where the prompt learner checkpoint will be saved.
+        """
         #create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
@@ -165,12 +202,28 @@ class CoOpSystem:
         torch.save(self.model.prompt_learner.state_dict(), os.path.join(path, f"{self.run_name}_prompt_learner.pth"))
 
     def load_model(self, path="./bin"):
+        """
+        Loads a saved model checkpoint from disk and sets the model to evaluation mode.
+
+        Args:
+            path (str): Directory path from which the model checkpoint will be loaded.
+        """
         # Load the model
         self.model.load_state_dict(torch.load(os.path.join(path, f"{self.run_name}.pth")))
         self.model.eval()
         print(f"Model loaded from {path}")
 
     def compute_evaluation(self, epoch_idx, base=False):
+        """
+        Evaluates the model (or zero-shot CLIP if base=True) on the base test set and logs accuracy.
+
+        Args:
+            epoch_idx (int): Index of the current epoch for logging.
+            base (bool): If True, use zero-shot CLIP model for evaluation instead of the trained model.
+
+        Returns:
+            float: Accuracy on the base test set.
+        """
         base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.batch_size, self.device, label="test", base=base)
         # Log to TensorBoard
         self.log_value(epoch_idx,  base_accuracy, "base_classes")
@@ -178,6 +231,17 @@ class CoOpSystem:
         return base_accuracy
 
     def get_optimizer(self, lr, wd, momentum):
+        """
+        Instantiates and returns the optimizer for the model parameters.
+
+        Args:
+            lr (float): Learning rate.
+            wd (float): Weight decay.
+            momentum (float): Momentum term (unused for Adam optimizer).
+
+        Returns:
+            torch.optim.Optimizer: Configured Adam optimizer instance.
+        """
         optimizer = Adam([
             {
                 "params": self.model.parameters()
@@ -187,8 +251,25 @@ class CoOpSystem:
         return optimizer
 
     def log_value(self, step,  accuracy, prefix):
+        """
+        Logs a single scalar value (accuracy) to TensorBoard.
+
+        Args:
+            step (int): Training step or epoch index.
+            accuracy (float): Accuracy value to log.
+            prefix (str): Tag prefix to categorize the metric in TensorBoard.
+        """
         self.writer.add_scalar(f"{prefix}/accuracy", accuracy, step)
 
     def log_values(self, step, loss, accuracy, prefix):
+        """
+        Logs both loss and accuracy values to TensorBoard.
+
+        Args:
+            step (int): Training step or epoch index.
+            loss (float): Loss value to log.
+            accuracy (float): Accuracy value to log.
+            prefix (str): Tag prefix to categorize the metrics in TensorBoard.
+        """
         self.writer.add_scalar(f"{prefix}/loss", loss, step)
         self.writer.add_scalar(f"{prefix}/accuracy", accuracy, step)

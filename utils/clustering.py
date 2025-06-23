@@ -1,0 +1,205 @@
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from tqdm import tqdm
+import torch
+from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+import clip
+import os
+import pickle
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics.pairwise import cosine_distances
+from collections import Counter
+
+def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../data"):
+    """
+    Clusters base classes using visual features extracted from a CLIP model. Applies PCA to reduce dimensionality
+    and Agglomerative Clustering on cosine distances to group the categories.
+
+    Args:
+        device (torch.device): The device to run computations on (CPU/GPU).
+        cnn (str): CLIP model architecture name (e.g., "ViT-B/32").
+        n_clusters (int): Number of clusters to generate.
+        variance (float): Variance ratio to preserve during PCA.
+
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
+    """
+
+    # initialize clip model with ViT
+    clip_model, preprocess = clip.load(cnn)
+    clip_model = clip_model.to(device)
+
+    train_set, _, _ = get_data(data_dir=data_dir, transform=preprocess)
+
+    # split classes into base and novel
+    base_classes, _ = base_novel_categories(train_set)
+
+    # split the three datasets
+    train_base, _ = split_data(train_set, base_classes)
+
+    class_feature = {}
+    with torch.no_grad():
+        for c in tqdm(base_classes, desc="Processing classes"):
+            imgs_c = [img for img, label in train_base if label == c]
+            features = [
+                clip_model.encode_image(img.unsqueeze(0).to(device)).cpu().numpy()
+                for img in imgs_c
+            ]
+            class_feature[c] = np.mean(features, axis=0)
+
+    # class_ft_array = np.array([class_feature[c][0] for c in base_classes])
+
+    cat2idx = {}
+    idx2cat = {}
+    class_ft_array = []
+    for i, c in enumerate(base_classes):
+        cat2idx[c] = i
+        idx2cat[i] = c
+        class_ft_array.append(class_feature[c][0])
+
+    pca = PCA(n_components=variance)
+    X_reduced = pca.fit_transform(class_ft_array)
+
+    print(
+        f"Reduced feature shape: {X_reduced.shape}, Variance explained: {pca.explained_variance_ratio_.sum()}"
+    )
+
+    cosine_dist = cosine_distances(X_reduced)
+    # Step 5: Agglomerative clustering
+    agglo = AgglomerativeClustering(
+        n_clusters=n_clusters, metric="precomputed", linkage="average"
+    )
+    cluster_labels = agglo.fit_predict(cosine_dist)
+
+    cluster_labels = {idx2cat[i]: cluster for i, cluster in enumerate(cluster_labels)}
+
+    cluster_labels_text = {
+        CLASS_NAMES[base_class]: int(cluster)
+        for base_class, cluster in enumerate(cluster_labels)
+    }
+
+    torch.cuda.empty_cache()
+
+    return cluster_labels, cluster_labels_text
+
+
+def random_clustering(
+    n_cluster,
+    seed=42,
+    data_dir="../data",
+    distribution="uniform",
+):
+    """
+    Generates random cluster assignments for a given number of clusters.
+
+    Args:
+        n_cluster (int): Number of clusters to generate.
+        seed (int): Random seed for reproducibility.
+        data_dir (str): Directory where the dataset is stored.
+        distribution (str): Distribution type for cluster assignment. Options are "uniform", "random", or "sequential".
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
+    """
+
+    np.random.seed(seed)
+    train_set, _, _ = get_data(data_dir=data_dir)
+    base_classes, _ = base_novel_categories(train_set)
+
+    # split train_base into n_cluster clusters
+    cluster_labels = {}
+    if distribution == "uniform":
+        shuffled = np.random.permutation(base_classes)
+
+        for i, cls in enumerate(shuffled):
+            cluster_labels[cls] = i % n_cluster
+    elif distribution == "random":
+        cluster_labels = {
+            base_class: np.random.choice(range(n_cluster))
+            for base_class in base_classes
+        }
+    elif distribution == "sequential":
+        cluster_labels = {
+            base_class: i % n_cluster for i, base_class in enumerate(base_classes)
+        }
+    else:
+        raise ValueError(f"Unknown distribution: {distribution}")
+
+    cluster_labels_text = {
+        CLASS_NAMES[base_class]: int(cluster)
+        for base_class, cluster in enumerate(cluster_labels.values())
+    }
+
+    cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
+
+    # reset the random seed
+    np.random.seed(None)
+
+    return cluster_dict_int, cluster_labels_text
+
+
+def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data"):
+    """
+    Loads existing cluster labels from disk if available, otherwise computes and saves new cluster assignments.
+
+    Args:
+        n_cluster (int): Number of clusters to generate.
+        variance (float): Variance ratio to preserve during PCA.
+        cnn (str): CLIP model architecture name (used for naming output files).
+        device (torch.device): The device to run computations on.
+
+    Returns:
+        Tuple[Dict[int, int], Dict[str, int]]: Dictionaries for integer-labeled and text-labeled cluster assignments.
+    """
+    cnn_sanitized = cnn.replace("/", "_")
+    save_dir = f"clustering_split/cluster_labels_{n_cluster}_{variance}_{cnn_sanitized}"
+    os.makedirs(save_dir, exist_ok=True)
+
+    int_categories_path = os.path.join(save_dir, "int_categories.pkl")
+    text_categories_path = os.path.join(save_dir, "text_categories.pkl")
+
+    if os.path.exists(int_categories_path) and os.path.exists(text_categories_path):
+        print("🟩 CLUSTERS FILES FOUND. Loading existing cluster labels...")
+        with open(int_categories_path, "rb") as f:
+            cluster_labels = pickle.load(f)
+            cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
+        with open(text_categories_path, "rb") as f:
+            cluster_labels_text = pickle.load(f)
+
+    else:
+        print("🟧 NO CLUSTERS FILES FOUND. Loading existing cluster labels...")
+        # cluster the base classes
+        cluster_labels, cluster_labels_text = cluster_categories(
+            device, n_clusters=n_cluster, variance=variance, cnn=cnn, data_dir=data_dir
+        )
+        cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
+        with open(int_categories_path, "wb") as f:
+            pickle.dump(cluster_labels, f)
+        with open(text_categories_path, "wb") as f:
+            pickle.dump(cluster_labels_text, f)
+    # Count samples in each cluster
+    cluster_counts = Counter(cluster_dict_int.values())
+    for cluster_id in range(n_cluster):
+        print(f"Cluster {cluster_id} count: {cluster_counts.get(cluster_id, 0)}")
+
+    return cluster_dict_int, cluster_labels_text
+
+
+if __name__ == "__main__":
+
+    N_CLUSTERS = 2
+    VARIANCE = 0.95
+    CNN = "ViT-B/32"
+
+    # set device to either cuda, mps or cpu
+
+    DEVICE = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
+
+    cls_cluster_dict_int, cluster_labels_text = conditional_clustering(
+        N_CLUSTERS, VARIANCE, CNN, DEVICE
+    )
+    print(cls_cluster_dict_int, cluster_labels_text)

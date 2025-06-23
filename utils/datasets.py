@@ -1,17 +1,19 @@
+import clip
 import torch
 import torchvision
-import clip
-from tqdm import tqdm
 CLASS_NAMES = ["pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold", "tiger lily", "moon orchid", "bird of paradise", "monkshood", "globe thistle", "snapdragon", "colt's foot", "king protea", "spear thistle", "yellow iris", "globe-flower", "purple coneflower", "peruvian lily", "balloon flower", "giant white arum lily", "fire lily", "pincushion flower", "fritillary", "red ginger", "grape hyacinth", "corn poppy", "prince of wales feathers", "stemless gentian", "artichoke", "sweet william", "carnation", "garden phlox", "love in the mist", "mexican aster", "alpine sea holly", "ruby-lipped cattleya", "cape flower", "great masterwort", "siam tulip", "lenten rose", "barbeton daisy", "daffodil", "sword lily", "poinsettia", "bolero deep blue", "wallflower", "marigold", "buttercup", "oxeye daisy", "common dandelion", "petunia", "wild pansy", "primula", "sunflower", "pelargonium", "bishop of llandaff", "gaura", "geranium", "orange dahlia", "pink-yellow dahlia?", "cautleya spicata", "japanese anemone", "black-eyed susan", "silverbush", "californian poppy", "osteospermum", "spring crocus", "bearded iris", "windflower", "tree poppy", "gazania", "azalea", "water lily", "rose", "thorn apple", "morning glory", "passion flower", "lotus", "toad lily", "anthurium", "frangipani", "clematis", "hibiscus", "columbine", "desert-rose", "tree mallow", "magnolia", "cyclamen", "watercress", "canna lily", "hippeastrum", "bee balm", "ball moss", "foxglove", "bougainvillea", "camellia", "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"]
 
 
 def get_data(data_dir="./data", transform=None):
-    """Load Flowers102 train, validation and test sets.
+    """
+    Loads the Flowers102 dataset from torchvision, returning separate splits for training, validation, and testing.
+
     Args:
-        data_dir (str): Directory where the dataset will be stored.
-        transform (torch.Compose)
+        data_dir (str): Directory where the dataset will be downloaded/stored. Defaults to "./data".
+        transform (torchvision.transforms.Compose or None): Transformations to apply to each image.
+
     Returns:
-        tuple: A tuple containing the train, validation, and test sets.
+        tuple: A tuple (train, val, test) of Flowers102 dataset splits.
     """
     train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=transform)
     val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=transform)
@@ -60,6 +62,16 @@ def split_data(dataset, base_classes):
 
 
 class ContiguousLabelDataset(torch.utils.data.Dataset):
+    """
+    A dataset wrapper that remaps arbitrary class labels to contiguous integers starting from 0.
+
+    This is useful for classification tasks where models expect class indices to be in a 0-based contiguous range.
+
+    Attributes:
+        dataset (Dataset): The original dataset to wrap.
+        cat2idx (Dict[Any, int]): Mapping from original class labels to contiguous integer indices.
+        idx2cat (Dict[int, Any]): Reverse mapping from indices back to original class labels.
+    """
     def __init__(self, dataset):
         self.dataset = dataset
         # Extract all labels from the dataset
@@ -75,3 +87,12 @@ class ContiguousLabelDataset(torch.utils.data.Dataset):
         image, label = self.dataset[index]
         mapped_label = self.cat2idx[label]
         return image, mapped_label
+
+if __name__ == "__main__":
+    # Load model
+    clip_model, preprocess = clip.load("ViT-B/32", device="mps")
+    clip_model = clip_model.to("mps")
+
+    train_set, val_set, test_set = get_data(transform=preprocess, data_dir="../data")
+    base_classes, novel_classes = base_novel_categories(train_set)
+    print(len(base_classes))
