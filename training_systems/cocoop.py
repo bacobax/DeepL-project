@@ -474,7 +474,7 @@ class CoCoOpSystem:
         last_model_state = None  # store last model state
 
         method = self.adversarial_method
-        with self.model.temporary_classnames(self.base_classes):
+        with self.model.temporary_classnames(CLASS_NAMES[c] for c in self.base_classes):
             for e in range(start_epoch, start_epoch + self.adv_training_epochs):
                 progress = (e - start_epoch + 1) / warmup_epochs
                 new_lambda_adv = initial_lambda_adv + (
@@ -573,7 +573,7 @@ class CoCoOpSystem:
             Tuple[float, float]: Accuracy for base and novel classes.
         """
         if not is_adv:
-            with self.model.temporary_classnames(self.base_classes):
+            with self.model.temporary_classnames(CLASS_NAMES[c] for c in self.base_classes):
                 metrics_base = self.eval_method.evaluate(
                     dataset=self.val_base,
                     desc_add=" - Base",
