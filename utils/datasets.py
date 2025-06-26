@@ -1,6 +1,8 @@
 import clip
 import torch
 import torchvision
+from torch.utils.data import Subset
+
 CLASS_NAMES = ["pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold", "tiger lily", "moon orchid", "bird of paradise", "monkshood", "globe thistle", "snapdragon", "colt's foot", "king protea", "spear thistle", "yellow iris", "globe-flower", "purple coneflower", "peruvian lily", "balloon flower", "giant white arum lily", "fire lily", "pincushion flower", "fritillary", "red ginger", "grape hyacinth", "corn poppy", "prince of wales feathers", "stemless gentian", "artichoke", "sweet william", "carnation", "garden phlox", "love in the mist", "mexican aster", "alpine sea holly", "ruby-lipped cattleya", "cape flower", "great masterwort", "siam tulip", "lenten rose", "barbeton daisy", "daffodil", "sword lily", "poinsettia", "bolero deep blue", "wallflower", "marigold", "buttercup", "oxeye daisy", "common dandelion", "petunia", "wild pansy", "primula", "sunflower", "pelargonium", "bishop of llandaff", "gaura", "geranium", "orange dahlia", "pink-yellow dahlia?", "cautleya spicata", "japanese anemone", "black-eyed susan", "silverbush", "californian poppy", "osteospermum", "spring crocus", "bearded iris", "windflower", "tree poppy", "gazania", "azalea", "water lily", "rose", "thorn apple", "morning glory", "passion flower", "lotus", "toad lily", "anthurium", "frangipani", "clematis", "hibiscus", "columbine", "desert-rose", "tree mallow", "magnolia", "cyclamen", "watercress", "canna lily", "hippeastrum", "bee balm", "ball moss", "foxglove", "bougainvillea", "camellia", "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"]
 
 
@@ -34,29 +36,46 @@ def base_novel_categories(dataset):
     return base_classes, novel_classes
 
 
+def get_labels(dataset):
+    """
+    Recursively retrieve labels from dataset or nested Subset.
+    Assumes the base dataset has a `_labels` attribute.
+    """
+    if hasattr(dataset, '_labels'):
+        return dataset._labels
+    elif isinstance(dataset, Subset):
+        parent_labels = get_labels(dataset.dataset)
+        return [parent_labels[i] for i in dataset.indices]
+    else:
+        raise AttributeError("Dataset does not have _labels or is not a Subset of a dataset with _labels.")
+
 def split_data(dataset, base_classes):
-    # these two lists will store the sample indexes
+    """
+    Splits the dataset into base and novel subsets based on base_classes.
+    Works even if the input dataset is already a Subset.
+
+    Args:
+        dataset: PyTorch Dataset or Subset
+        base_classes (List[int]): List of class indices considered as base.
+
+    Returns:
+        base_dataset (Subset): Subset containing samples from base classes.
+        novel_dataset (Subset): Subset containing samples from novel classes.
+    """
     base_categories_samples = []
     novel_categories_samples = []
 
-    # we create a set of base classes to compute the test below in O(1)
-    # this is optional and can be removed
+    labels = get_labels(dataset)
     base_set = set(base_classes)
 
-    # here we iterate over sample labels and also get the correspondent sample index
-    for sample_id, label in enumerate(dataset._labels):
+    for sample_id, label in enumerate(labels):
         if label in base_set:
             base_categories_samples.append(sample_id)
         else:
             novel_categories_samples.append(sample_id)
 
-    # here we create the dataset subsets
-    # the torch Subset is just a wrapper around the dataset
-    # it simply stores the subset indexes and the original dataset (your_subset.dataset)
-    # when asking for sample i in the subset, torch will look for its original position in the dataset and retrieve it
-    # https://pytorch.org/docs/stable/data.html#torch.utils.data.Subset
-    base_dataset = torch.utils.data.Subset(dataset, base_categories_samples)
-    novel_dataset = torch.utils.data.Subset(dataset, novel_categories_samples)
+    base_dataset = Subset(dataset, base_categories_samples)
+    novel_dataset = Subset(dataset, novel_categories_samples)
 
     return base_dataset, novel_dataset
 
