@@ -175,11 +175,14 @@ class CoCoOpSystem:
 
         if clustering_opt["use_random_clustering"]:
             # Use random clustering
-            self.cls_cluster_dict, _ = random_clustering(
+            self.cls_cluster_dict, _, self.pseudo_base, self.pseudo_novel = random_clustering(
                 n_cluster=clustering_opt["n_clusters"],
                 seed=clustering_opt["seed"],
-                distribution="uniform",
+                distribution="bipartite",
+                split_ratio=0.8
             )
+            self.train_pseudo_base, self.train_pseudo_novel = split_data(self.train_base, self.pseudo_base)
+
         else:
             # Load clustering information
             self.cls_cluster_dict, _ = conditional_clustering(
@@ -210,7 +213,7 @@ class CoCoOpSystem:
         )
 
         self.model = CustomCLIP(
-            classnames=[CLASS_NAMES[idx] for idx in self.base_classes],
+            classnames=[CLASS_NAMES[idx] for idx in self.pseudo_base],
             cfg=cfg,
             clip_model=self.clip_model,
         ).to(self.device)
@@ -399,12 +402,12 @@ class CoCoOpSystem:
 
             if self.using_kl[0]:
                 total_loss, acc, ce_loss, kl_loss = method.train_step(
-                    self.train_base,
+                    self.train_pseudo_base,
                     self.base_batch_size,
                 )
             else:
                 total_loss, acc = method.train_step(
-                    self.train_base,
+                    self.train_pseudo_base,
                     self.base_batch_size,
                 )
                 kl_loss = None
@@ -426,15 +429,16 @@ class CoCoOpSystem:
                 torch.save(self.model.state_dict(), best_model_path)
             else:
                 patience_counter += 1
-                # if patience_counter >= patience:
-                #     print(f"Early stopping at epoch {e}")
-                #     break
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {e}")
+                    break
             self.lr_scheduler.step()
             pbar.set_postfix(
+                base_val_acc=base_val_acc,
+                pseudo_novel_acc=novel_val_acc,
+                lr=self.optimizer.param_groups[0]["lr"],
                 ce_loss=ce_loss,
                 kl_loss=kl_loss,
-                base_val_acc=base_val_acc,
-                lr=self.optimizer.param_groups[0]["lr"],
                 pat_c=patience_counter,
             )
             pbar.update(1)
@@ -465,77 +469,78 @@ class CoCoOpSystem:
         last_model_state = None  # store last model state
 
         method = self.adversarial_method
+        with self.model.temporary_classnames(self.base_classes):
+            for e in range(start_epoch, start_epoch + self.adv_training_epochs):
+                progress = (e - start_epoch + 1) / warmup_epochs
+                new_lambda_adv = initial_lambda_adv + (
+                    lambda_adv_max - initial_lambda_adv
+                ) * min(progress, 1)
 
-        for e in range(start_epoch, start_epoch + self.adv_training_epochs):
-            progress = (e - start_epoch + 1) / warmup_epochs
-            new_lambda_adv = initial_lambda_adv + (
-                lambda_adv_max - initial_lambda_adv
-            ) * min(progress, 1)
+                method.update_lambda_adv(new_lambda_adv)
 
-            method.update_lambda_adv(new_lambda_adv)
+                if (e-start_epoch) < self.prompt_learner_warmup_epochs:
+                    for name, param in self.model.named_parameters():
+                        if "prompt_learner" in name:
+                            param.requires_grad_(False)
+                elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
+                    for name, param in self.model.named_parameters():
+                        if "prompt_learner" in name:
+                            param.requires_grad_(True)
 
-            if (e-start_epoch) < self.prompt_learner_warmup_epochs:
-                for name, param in self.model.named_parameters():
-                    if "prompt_learner" in name:
-                        param.requires_grad_(False)
-            elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
-                for name, param in self.model.named_parameters():
-                    if "prompt_learner" in name:
-                        param.requires_grad_(True)
-
-            if self.using_kl[1]:
-                total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
-                    self.train_base,
-                    self.base_batch_size,
-                )
-            else:
-                total_loss, acc, ce_loss, adv_loss = method.train_step(
-                    self.train_base,
-                    self.adv_batch_size,
-                )
-                kl_loss = None
-
-            self.logger.log_training_adv(
-                e,
-                method.lambda_adv,
-                ce_loss,
-                acc,
-                adv_loss,
-                ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
-                kl_loss=kl_loss,
-            )
-            if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
-
-                last_model_state = deepcopy(self.model.state_dict())
-
-                base_val_acc, novel_val_acc = self._evaluate_and_log(
-                    e,
-                    is_adv=True,
-                )
-                if novel_val_acc > best_novel_accuracy:
-                    best_novel_accuracy = novel_val_acc
-                    torch.save(self.model.state_dict(), best_model_path)
-                    at_least_one_improving = True
-                    patience_counter = 0
+                if self.using_kl[1]:
+                    total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
+                        self.train_base,
+                        self.base_batch_size,
+                    )
                 else:
-                    patience_counter += 1
-                #     if patience_counter >= patience:
-                #         print(f"Early stopping adversarial at epoch {e}")
-                #         break
-                pbar.set_postfix(
-                    ce_loss=ce_loss,
-                    kl_loss=kl_loss,
-                    adv_loss=adv_loss,
-                    base_val_acc=base_val_acc,
-                    lr=self.optimizer.param_groups[0]["lr"],
-                    pat_c=patience_counter,
-                )
-            else:
+                    total_loss, acc, ce_loss, adv_loss = method.train_step(
+                        self.train_base,
+                        self.adv_batch_size,
+                    )
+                    kl_loss = None
 
-                pbar.set_postfix(
-                    adv_loss=adv_loss,
+                self.logger.log_training_adv(
+                    e,
+                    method.lambda_adv,
+                    ce_loss,
+                    acc,
+                    adv_loss,
+                    ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
+                    kl_loss=kl_loss,
                 )
-            pbar.update(1)
+                if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
+
+                    last_model_state = deepcopy(self.model.state_dict())
+
+                    base_val_acc, novel_val_acc = self._evaluate_and_log(
+                        e,
+                        is_adv=True,
+                    )
+                    if novel_val_acc > best_novel_accuracy:
+                        best_novel_accuracy = novel_val_acc
+                        torch.save(self.model.state_dict(), best_model_path)
+                        at_least_one_improving = True
+                        patience_counter = 0
+                    else:
+                        patience_counter += 1
+                        if patience_counter >= patience:
+                            print(f"Early stopping adversarial at epoch {e}")
+                            break
+                    pbar.set_postfix(
+                        base_val_acc=base_val_acc,
+                        pseudo_novel_acc=novel_val_acc,
+                        ce_loss=ce_loss,
+                        kl_loss=kl_loss,
+                        adv_loss=adv_loss,
+                        lr=self.optimizer.param_groups[0]["lr"],
+                        pat_c=patience_counter,
+                    )
+                else:
+
+                    pbar.set_postfix(
+                        adv_loss=adv_loss,
+                    )
+                pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:
             self.model.load_state_dict(torch.load(best_model_path))
@@ -562,18 +567,27 @@ class CoCoOpSystem:
         Returns:
             Tuple[float, float]: Accuracy for base and novel classes.
         """
-        metrics_base = self.eval_method.evaluate(
-            dataset=self.val_base,
-            desc_add=" - Base",
-        )
+        if not is_adv:
+            with self.model.temporary_classnames(self.base_classes):
+                metrics_base = self.eval_method.evaluate(
+                    dataset=self.val_base,
+                    desc_add=" - Base",
+                )
+        else:
+            metrics_base = self.eval_method.evaluate(
+                dataset=self.val_base,
+                desc_add=" - Base",
+            )
+
         base_val_loss = metrics_base["loss"]
         base_val_acc = metrics_base["accuracy"]
 
         metrics_novel = self.eval_method.evaluate(
-            dataset=self.val_novel,
-            new_classnames=self.novel_classes,
+            dataset=self.train_pseudo_novel,
+            new_classnames=self.pseudo_novel,
             desc_add=" - Novel",
         )
+
         novel_val_loss = metrics_novel["loss"]
         novel_val_acc = metrics_novel["accuracy"]
 
