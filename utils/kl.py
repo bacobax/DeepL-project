@@ -41,7 +41,7 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     student_logits_tmp = []
     for img_logits in student_logits:
         student_logits_tmp.append(
-            [logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in categories_novel_tensor])
+            [logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in [tmp_dataset.cat2idx[c] for c in categories_novel_tensor]])
     student_logits = torch.tensor(student_logits_tmp).to(device)
     # print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
     kl_loss = torch.nn.functional.kl_div(
