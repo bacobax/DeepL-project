@@ -88,7 +88,7 @@ class BaseCoCoOp(TrainingMethod):
 
         logits_base, loss_ce = self.model(inputs_base, targets_base)
         # === Combine losses ===
-
+        print("SHAPES LOGITS: ",logits_base.shape, targets_base.shape)
         loss_ce.backward()
 
         self.optimizer_step()
