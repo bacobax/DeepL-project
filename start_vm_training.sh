@@ -13,9 +13,9 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-  "mlp_test"
+  "test"
 )
-DEBUG="false"
+DEBUG="true"
 
 # This will be set inside the loop
 HPARAMS_DIR="hparams_configs"
