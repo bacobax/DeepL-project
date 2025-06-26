@@ -216,7 +216,7 @@ class CoCoOpSystem:
                 "INPUT": {"SIZE": [resolution, resolution]},
             }
         )
-
+        print(f"pseudo base:" , self.pseudo_base)
         self.model = CustomCLIP(
             classnames=[CLASS_NAMES[idx] for idx in self.pseudo_base],
             cfg=cfg,
