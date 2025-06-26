@@ -5,6 +5,7 @@ Includes configuration, data loading, model preparation, and training logic for 
 
 import os
 import math
+from collections import Counter
 from copy import deepcopy
 
 import torch
@@ -181,6 +182,10 @@ class CoCoOpSystem:
                 distribution="bipartite",
                 split_ratio=0.8
             )
+            cluster_counts = Counter(self.cls_cluster_dict.values())
+            for cluster_id in range(2):
+                print(f"Cluster {cluster_id} count: {cluster_counts.get(cluster_id, 0)}")
+
             self.train_pseudo_base, self.train_pseudo_novel = split_data(self.train_base, self.pseudo_base)
 
         else:
