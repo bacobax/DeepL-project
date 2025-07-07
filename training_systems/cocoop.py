@@ -10,7 +10,7 @@ from copy import deepcopy
 import torch
 from easydict import EasyDict
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 import clip
@@ -611,7 +611,7 @@ class CoCoOpSystem:
             float: Learning rate multiplier.
         """
         if current_epoch < self.warmup_epoch:
-            return self.warmup_cons_lr / self.optimizer_configs[0].prompt_lr
+            return self.warmup_cons_lr / self.optimizer_configs[0].prompt_lr # type: ignore
         return 0.5 * (
             1
             + math.cos(
