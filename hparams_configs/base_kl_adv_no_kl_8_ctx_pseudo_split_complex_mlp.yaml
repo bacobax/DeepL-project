@@ -28,7 +28,7 @@ cocoop:
     class_token_position: "end"
     csc: false
   kl_loss_opt:
-    lambda_kl: [0.35, 0.1]
+    lambda_kl: [0.4, 0.1]
     using_kl: [true, false]
   adv_training_opt:
     batch_size: 10
@@ -37,7 +37,7 @@ cocoop:
     lambda_adv: 1.5
     grl_lambda: 1
     mlp_opt:
-      hidden_structure: [563, 256, 128]
+      hidden_structure: [563, 563, 256, 128, 64, 32]
     prompt_learner_warmup_epochs: 0
   base_training_opt:
     batch_size: 10
