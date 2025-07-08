@@ -483,79 +483,79 @@ class CoCoOpSystem:
         last_model_state = None  # store last model state
 
         method = self.adversarial_method
-        with self.model.temporary_classnames([CLASS_NAMES[c] for c in self.base_classes]):
-            for e in range(start_epoch, start_epoch + self.adv_training_epochs):
-                progress = (e - start_epoch + 1) / warmup_epochs
-                new_lambda_adv = initial_lambda_adv + (
-                    lambda_adv_max - initial_lambda_adv
-                ) * min(progress, 1)
 
-                method.update_lambda_adv(new_lambda_adv)
+        for e in range(start_epoch, start_epoch + self.adv_training_epochs):
+            progress = (e - start_epoch + 1) / warmup_epochs
+            new_lambda_adv = initial_lambda_adv + (
+                lambda_adv_max - initial_lambda_adv
+            ) * min(progress, 1)
 
-                if (e-start_epoch) < self.prompt_learner_warmup_epochs:
-                    for name, param in self.model.named_parameters():
-                        if "prompt_learner" in name:
-                            param.requires_grad_(False)
-                elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
-                    for name, param in self.model.named_parameters():
-                        if "prompt_learner" in name:
-                            param.requires_grad_(True)
+            method.update_lambda_adv(new_lambda_adv)
 
-                if self.using_kl[1]:
-                    total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
-                        self.train_base,
-                        self.base_batch_size,
-                    )
-                else:
-                    total_loss, acc, ce_loss, adv_loss = method.train_step(
-                        self.train_base,
-                        self.adv_batch_size,
-                    )
-                    kl_loss = None
+            if (e-start_epoch) < self.prompt_learner_warmup_epochs:
+                for name, param in self.model.named_parameters():
+                    if "prompt_learner" in name:
+                        param.requires_grad_(False)
+            elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
+                for name, param in self.model.named_parameters():
+                    if "prompt_learner" in name:
+                        param.requires_grad_(True)
 
-                self.logger.log_training_adv(
-                    e,
-                    method.lambda_adv,
-                    ce_loss,
-                    acc,
-                    adv_loss,
-                    ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
-                    kl_loss=kl_loss,
+            if self.using_kl[1]:
+                total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
+                    self.train_base,
+                    self.base_batch_size,
                 )
-                if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
+            else:
+                total_loss, acc, ce_loss, adv_loss = method.train_step(
+                    self.train_base,
+                    self.adv_batch_size,
+                )
+                kl_loss = None
 
-                    last_model_state = deepcopy(self.model.state_dict())
+            self.logger.log_training_adv(
+                e,
+                method.lambda_adv,
+                ce_loss,
+                acc,
+                adv_loss,
+                ce_loss + adv_loss + (kl_loss if kl_loss else 0.0),
+                kl_loss=kl_loss,
+            )
+            if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
 
-                    base_val_acc, novel_val_acc = self._evaluate_and_log(
-                        e,
-                        is_adv=True,
-                    )
-                    if novel_val_acc > best_novel_accuracy:
-                        best_novel_accuracy = novel_val_acc
-                        print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
-                        torch.save(self.model.state_dict(), best_model_path)
-                        at_least_one_improving = True
-                        patience_counter = 0
-                    else:
-                        patience_counter += 1
-                        if patience_counter >= patience:
-                            print(f"Early stopping adversarial at epoch {e}")
-                            break
-                    pbar.set_postfix(
-                        base_val_acc=base_val_acc,
-                        pseudo_novel_acc=novel_val_acc,
-                        ce_loss=ce_loss,
-                        kl_loss=kl_loss,
-                        adv_loss=adv_loss,
-                        lr=self.optimizer.param_groups[0]["lr"],
-                        pat_c=patience_counter,
-                    )
+                last_model_state = deepcopy(self.model.state_dict())
+
+                base_val_acc, novel_val_acc = self._evaluate_and_log(
+                    e,
+                    is_adv=True,
+                )
+                if novel_val_acc > best_novel_accuracy:
+                    best_novel_accuracy = novel_val_acc
+                    print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
+                    torch.save(self.model.state_dict(), best_model_path)
+                    at_least_one_improving = True
+                    patience_counter = 0
                 else:
+                    patience_counter += 1
+                    if patience_counter >= patience:
+                        print(f"Early stopping adversarial at epoch {e}")
+                        break
+                pbar.set_postfix(
+                    base_val_acc=base_val_acc,
+                    pseudo_novel_acc=novel_val_acc,
+                    ce_loss=ce_loss,
+                    kl_loss=kl_loss,
+                    adv_loss=adv_loss,
+                    lr=self.optimizer.param_groups[0]["lr"],
+                    pat_c=patience_counter,
+                )
+            else:
 
-                    pbar.set_postfix(
-                        adv_loss=adv_loss,
-                    )
-                pbar.update(1)
+                pbar.set_postfix(
+                    adv_loss=adv_loss,
+                )
+            pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:
             print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
