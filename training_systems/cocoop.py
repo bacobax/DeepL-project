@@ -221,6 +221,7 @@ class CoCoOpSystem:
             cfg=cfg,
             clip_model=self.clip_model,
         ).to(self.device)
+        print(f"[DEBUG] Model constructed with classnames: {[CLASS_NAMES[idx] for idx in self.pseudo_base_classes]}")
 
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
@@ -332,7 +333,9 @@ class CoCoOpSystem:
             # Base training phase
             base_end_epoch, _ = self._train_base_phase(best_model_path)
             if self.epochs != 0:
+                print(f"[DEBUG] Loading model state dict after base phase from: {best_model_path}")
                 self.model.load_state_dict(torch.load(best_model_path))
+                print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
                 self.save_model(path="./bin/cocoop", prefix="after_first_train_")
 
             if not self.skip_tests[1]:
@@ -347,8 +350,9 @@ class CoCoOpSystem:
         else:
             base_end_epoch = 0
             print("Skipping base training")
-            # Load the model from the checkpoint
+            print(f"[DEBUG] Loading model state dict from: {self.train_base_checkpoint_path}")
             self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
+            print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
 
         # Re-initialize test/eval/train methods after loading/training model and before adversarial phase
         self._set_eval_method()
@@ -528,6 +532,7 @@ class CoCoOpSystem:
                     )
                     if novel_val_acc > best_novel_accuracy:
                         best_novel_accuracy = novel_val_acc
+                        print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
                         torch.save(self.model.state_dict(), best_model_path)
                         at_least_one_improving = True
                         patience_counter = 0
@@ -553,9 +558,14 @@ class CoCoOpSystem:
                 pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:
-            self.model.load_state_dict(torch.load(best_model_path))
-            print("Loaded best model from adversarial checkpoint.")
-
+            print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
+            state_dict = torch.load(best_model_path)
+            model_state = self.model.state_dict()
+            filtered_state_dict = {k: v for k, v in state_dict.items() if k in model_state and v.shape == model_state[k].shape}
+            model_state.update(filtered_state_dict)
+            self.model.load_state_dict(model_state)
+            print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
+            print("Loaded best model from adversarial checkpoint (robust, filtered mismatched keys).")
         else:
             print(
                 "No improvement during second training. Using model from last adversarial epoch."
@@ -690,6 +700,7 @@ class CoCoOpSystem:
             prefix (str): Filename prefix to distinguish models.
         """
         os.makedirs(path, exist_ok=True)
+        print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
         torch.save(
             self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
         )
