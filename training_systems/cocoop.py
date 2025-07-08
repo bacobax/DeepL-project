@@ -571,7 +571,13 @@ class CoCoOpSystem:
                 "No improvement during second training. Using model from last adversarial epoch."
             )
             if last_model_state is not None:
-                self.model.load_state_dict(last_model_state)
+                model_state = self.model.state_dict()
+                filtered_state_dict = {
+                    k: v for k, v in last_model_state.items()
+                    if k in model_state and v.shape == model_state[k].shape
+                }
+                model_state.update(filtered_state_dict)
+                self.model.load_state_dict(model_state)
                 print("Loaded last adversarial model state.")
 
         return start_epoch + self.adv_training_epochs
