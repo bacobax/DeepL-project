@@ -115,8 +115,6 @@ def random_clustering(
     base_classes, _ = base_novel_categories(train_set)
 
     cluster_labels = {}
-    cluster_0_classes = []
-    cluster_1_classes = []
 
     if distribution == "uniform":
         shuffled = np.random.permutation(base_classes)
@@ -134,36 +132,6 @@ def random_clustering(
             cluster_id = i % n_cluster
             cluster_labels[cls] = cluster_id
 
-    elif distribution == "bipartite":
-        if n_cluster != 2:
-            raise ValueError("bipartite distribution requires n_cluster == 2")
-
-        if not (0.0 < split_ratio < 1.0):
-            raise ValueError("split_ratio must be between 0 and 1")
-
-        n_total = len(base_classes)
-        n_major = int(round(n_total * split_ratio))
-
-        shuffled = np.random.permutation(base_classes)
-        cluster_0_classes = list(shuffled[:n_major])
-        cluster_1_classes = list(shuffled[n_major:])
-
-        for cls in cluster_0_classes:
-            cluster_labels[cls] = 0
-        for cls in cluster_1_classes:
-            cluster_labels[cls] = 1
-
-    else:
-        raise ValueError(f"Unknown distribution: {distribution}")
-
-    # For non-bipartite, fill cluster_0_classes and cluster_1_classes for completeness
-    if distribution != "bipartite":
-        for cls, cid in cluster_labels.items():
-            if cid == 0:
-                cluster_0_classes.append(cls)
-            elif cid == 1:
-                cluster_1_classes.append(cls)
-
     cluster_labels_text = {
         CLASS_NAMES[cls]: int(cluster_labels[cls])
         for cls in cluster_labels
@@ -171,9 +139,7 @@ def random_clustering(
 
     cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
 
-    np.random.seed(None)
-
-    return cluster_dict_int, cluster_labels_text, cluster_0_classes, cluster_1_classes
+    return cluster_dict_int, cluster_labels_text
 
 
 def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data"):

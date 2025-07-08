@@ -244,11 +244,32 @@ class CoCoOpSystem:
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
 
         # --- NEW: Cluster dict for adversarial phase ---
-        # Pseudo_base: cluster 0, pseudo_novel: cluster 1
-        self.pseudo_cls_cluster_dict = {c: 0 for c in self.pseudo_base_classes}
-        self.pseudo_cls_cluster_dict.update({c: 1 for c in self.pseudo_novel_classes})
-        # For adversarial phase, use this dict
-        self.cls_cluster_dict = self.pseudo_cls_cluster_dict
+
+        clustering_type = clustering_opt["clustering_type"]
+
+        if clustering_type == "random":
+            # Use random clustering
+            self.cls_cluster_dict, _ = random_clustering(
+                n_cluster=clustering_opt["n_clusters"],
+                seed=clustering_opt["seed"],
+                distribution="uniform",
+            )
+        elif clustering_type == "semantic": 
+            # Load clustering information
+            self.cls_cluster_dict, _ = conditional_clustering(
+                n_cluster=clustering_opt["n_clusters"],
+                variance=clustering_opt["variance"],
+                cnn=clustering_opt["vision_encoder"],
+                device=self.device,
+            )
+        elif clustering_type == "default":
+            # Pseudo_base: cluster 0, pseudo_novel: cluster 1
+            self.pseudo_cls_cluster_dict = {c: 0 for c in self.pseudo_base_classes}
+            self.pseudo_cls_cluster_dict.update({c: 1 for c in self.pseudo_novel_classes})
+            # For adversarial phase, use this dict
+            self.cls_cluster_dict = self.pseudo_cls_cluster_dict
+        else:
+            raise ValueError(f"Unknown clustering type: {clustering_type}")
 
     def _set_test_methods(self):
         """
@@ -559,11 +580,7 @@ class CoCoOpSystem:
 
         if at_least_one_improving and self.epochs != 0:
             print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
-            state_dict = torch.load(best_model_path)
-            model_state = self.model.state_dict()
-            filtered_state_dict = {k: v for k, v in state_dict.items() if k in model_state and v.shape == model_state[k].shape}
-            model_state.update(filtered_state_dict)
-            self.model.load_state_dict(model_state)
+            self.model.load_state_dict(torch.load(best_model_path))
             print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
             print("Loaded best model from adversarial checkpoint (robust, filtered mismatched keys).")
         else:
@@ -571,13 +588,7 @@ class CoCoOpSystem:
                 "No improvement during second training. Using model from last adversarial epoch."
             )
             if last_model_state is not None:
-                model_state = self.model.state_dict()
-                filtered_state_dict = {
-                    k: v for k, v in last_model_state.items()
-                    if k in model_state and v.shape == model_state[k].shape
-                }
-                model_state.update(filtered_state_dict)
-                self.model.load_state_dict(model_state)
+                self.model.load_state_dict(self.model.state_dict())
                 print("Loaded last adversarial model state.")
 
         return start_epoch + self.adv_training_epochs
@@ -672,22 +683,22 @@ class CoCoOpSystem:
         """
         if base:
             base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
-                dataset=self.split_by_classes(self.test_base, self.pseudo_base_classes),
+                dataset=self.test_base,
                 desc_add=" - Pseudo Base Zero Shot",
             )
             novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
-                dataset=self.split_by_classes(self.test_base, self.pseudo_novel_classes),
+                dataset=self.test_novel,
                 desc_add=" - Pseudo Novel Zero Shot",
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
-                dataset=self.split_by_classes(self.test_base, self.pseudo_base_classes),
-                new_classnames=self.pseudo_base_classes,
+                dataset=self.test_base,
+                new_classnames=self.base_classes,
                 desc_add=" - Pseudo Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
-                dataset=self.split_by_classes(self.test_base, self.pseudo_novel_classes),
-                new_classnames=self.pseudo_novel_classes,
+                dataset=self.test_novel,
+                new_classnames=self.novel_classes,
                 desc_add=" - Pseudo Novel Fine Tuned",
             )
 
@@ -707,9 +718,10 @@ class CoCoOpSystem:
         """
         os.makedirs(path, exist_ok=True)
         print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
-        torch.save(
-            self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
-        )
+        with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.base_classes]):
+            torch.save(
+                self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
+            )
 
     def save_mlp_adversary(self, path="./bin/cocoop", prefix=""):
         """
