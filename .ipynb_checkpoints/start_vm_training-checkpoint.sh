@@ -13,7 +13,7 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-  "test"
+  "base_kl_adv_no_kl_8_ctx_pseudo_split"
 )
 DEBUG="true"
 
