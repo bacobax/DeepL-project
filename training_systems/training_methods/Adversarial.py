@@ -127,9 +127,9 @@ class Adversarial(TrainingMethod):
                 ce_grads = self.get_grads(ce_loss)
             else:
                 ce_grads = None  # Or torch.zeros_like(...), depending on downstream use
-            if batch_idx < 3 and self.debug:
+            """if batch_idx < 3 and self.debug:
                 bce_grads = self.get_grads(loss_bce)
-                self.print_grads_norms(bce_grads, ce_grads)
+                self.print_grads_norms(bce_grads, ce_grads)"""
             total_loss = ce_loss + self.lambda_adv * loss_bce
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(

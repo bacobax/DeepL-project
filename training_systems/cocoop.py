@@ -190,35 +190,10 @@ class CoCoOpSystem:
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
-<<<<<<< HEAD
-        if clustering_opt["use_random_clustering"]:
-            # Use random clustering
-            self.cls_cluster_dict, _, self.pseudo_base, self.pseudo_novel = random_clustering(
-                n_cluster=clustering_opt["n_clusters"],
-                seed=clustering_opt["seed"],
-                distribution="bipartite",
-                split_ratio=0.8
-            )
-            cluster_counts = Counter(self.cls_cluster_dict.values())
-            for cluster_id in range(2):
-                print(f"Cluster {cluster_id} count: {cluster_counts.get(cluster_id, 0)}")
-
-            self.train_pseudo_base, self.train_pseudo_novel = split_data(self.train_base, self.pseudo_base)
-
-        else:
-            # Load clustering information
-            self.cls_cluster_dict, _ = conditional_clustering(
-                n_cluster=clustering_opt["n_clusters"],
-                variance=clustering_opt["variance"],
-                cnn=clustering_opt["vision_encoder"],
-                device=self.device,
-            )
-=======
         self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
         self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
         self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
         self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
->>>>>>> f8c2921ee923d8ae8ccc208b6a32fe0e5bd2c0b9
 
         # --- Model/classnames: only pseudo_base for first phase ---
         resolution = self.clip_model.visual.input_resolution
@@ -240,13 +215,9 @@ class CoCoOpSystem:
                 "INPUT": {"SIZE": [resolution, resolution]},
             }
         )
-        print(f"pseudo base:" , self.pseudo_base)
         self.model = CustomCLIP(
-<<<<<<< HEAD
-            classnames=[CLASS_NAMES[idx] for idx in self.pseudo_base],
-=======
+
             classnames=[CLASS_NAMES[idx] for idx in self.pseudo_base_classes],
->>>>>>> f8c2921ee923d8ae8ccc208b6a32fe0e5bd2c0b9
             cfg=cfg,
             clip_model=self.clip_model,
         ).to(self.device)
@@ -606,38 +577,19 @@ class CoCoOpSystem:
         Returns:
             Tuple[float, float]: Accuracy for base and novel classes.
         """
-<<<<<<< HEAD
-        if not is_adv:
-            with self.model.temporary_classnames([CLASS_NAMES[c] for c in self.base_classes]):
-                metrics_base = self.eval_method.evaluate(
-                    dataset=self.val_base,
-                    desc_add=" - Base",
-                )
-        else:
-            metrics_base = self.eval_method.evaluate(
-                dataset=self.val_base,
-                desc_add=" - Base",
-            )
 
-=======
         metrics_base = self.eval_method.evaluate(
             dataset=self.val_pseudo_base,
             desc_add=" - Pseudo Base",
         )
->>>>>>> f8c2921ee923d8ae8ccc208b6a32fe0e5bd2c0b9
         base_val_loss = metrics_base["loss"]
         base_val_acc = metrics_base["accuracy"]
 
         metrics_novel = self.eval_method.evaluate(
-<<<<<<< HEAD
-            dataset=self.train_pseudo_novel,
-            new_classnames=self.pseudo_novel,
-            desc_add=" - Novel",
-=======
+
             dataset=self.val_pseudo_novel,
             new_classnames=self.pseudo_novel_classes,
             desc_add=" - Pseudo Novel",
->>>>>>> f8c2921ee923d8ae8ccc208b6a32fe0e5bd2c0b9
         )
 
         novel_val_loss = metrics_novel["loss"]

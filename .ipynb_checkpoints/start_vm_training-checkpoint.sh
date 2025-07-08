@@ -13,9 +13,9 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-  "mlp_test"
+  "base_kl_adv_no_kl_8_ctx_pseudo_split"
 )
-DEBUG="false"
+DEBUG="true"
 
 # This will be set inside the loop
 HPARAMS_DIR="hparams_configs"
