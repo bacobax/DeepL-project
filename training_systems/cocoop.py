@@ -35,7 +35,7 @@ from training_systems.evaluation_methods import (
     FineTunedTestStep,
     EvalStep,
 )
-from utils.clustering import conditional_clustering, random_clustering
+from utils.clustering import conditional_clustering, random_clustering, rotating_cluster_generator_shift
 from training_systems.training_methods.DoubleDatasetTrainingMethod import DoubleDatasetTrainingMethod
 
 
@@ -185,12 +185,6 @@ class CoCoOpSystem:
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         # --- NEW: Pseudo-base/novel split ---
-   
-        base_classes_shuffled = self.base_classes.copy()
-        random.Random(self.pseudo_split_seed).shuffle(base_classes_shuffled)
-        n_pseudo_base = int(len(base_classes_shuffled) * self.pseudo_base_ratio)
-        self.pseudo_base_classes = sorted(base_classes_shuffled[:n_pseudo_base])
-        self.pseudo_novel_classes = sorted(base_classes_shuffled[n_pseudo_base:])
 
         # Helper to split a dataset by class list
         # (moved to method below)
@@ -199,6 +193,9 @@ class CoCoOpSystem:
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
+
+        self.cluster_generator = rotating_cluster_generator_shift(self.base_classes, self.pseudo_base_ratio)
+        _, self.pseudo_base_classes, self.pseudo_novel_classes = next(cluster_generator)
 
         self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
         self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
@@ -455,6 +452,12 @@ class CoCoOpSystem:
 
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
+                    _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
+                    self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
+                    self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
+                    self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
+                    self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
+
                     kl_loss, ce_loss, acc = method.double_datasets_train_step(
                         self.train_pseudo_base,
                         self.train_pseudo_novel,

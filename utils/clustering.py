@@ -3,13 +3,53 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 import torch
-from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+from datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 import clip
 import os
 import pickle
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_distances
-from collections import Counter
+from collections import Counter, deque
+
+
+import random
+from collections import deque
+
+def create_cluster_from_ordered_list(ordered_categories, split_ratio):
+    """
+    Converts a list of categories into a cluster dict using split_ratio.
+    """
+    n = len(ordered_categories)
+    n_zeros = int(n * split_ratio)
+    return {
+        cat: 0 if i < n_zeros else 1
+        for i, cat in enumerate(ordered_categories)
+    }
+
+def rotating_cluster_generator_shift(categories, split_ratio, steps=1, seed=None):
+    """
+    Yields clusters by cyclically rotating the category list.
+
+    Args:
+        categories (list): List of category identifiers.
+        split_ratio (float): Ratio of cluster 0 elements.
+        seed (int, optional): Random seed for reproducibility.
+
+    Yields:
+        dict: Cluster mapping.
+    """
+    cat_list = list(categories)
+    if seed is not None:
+        random.seed(seed)
+    random.shuffle(cat_list)
+    cat_deque = deque(cat_list)
+
+    while True:
+        cluster = create_cluster_from_ordered_list(cat_deque, split_ratio)
+        cat0 = [cat for cat, c in cluster.items() if c == 0]
+        cat1 = [cat for cat, c in cluster.items() if c == 1]
+        yield cluster, cat0, cat1
+        cat_deque.rotate(-steps)  # rotate left
 
 def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../data"):
     """
@@ -188,22 +228,38 @@ def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data")
 
     return cluster_dict_int, cluster_labels_text
 
+def clusters_history(split_ratio: float):
+   pass
 
+
+# if __name__ == "__main__":
+
+#     N_CLUSTERS = 2
+#     VARIANCE = 0.95
+#     CNN = "ViT-B/32"
+
+#     # set device to either cuda, mps or cpu
+
+#     DEVICE = torch.device(
+#         "cuda"
+#         if torch.cuda.is_available()
+#         else "mps" if torch.backends.mps.is_available() else "cpu"
+#     )
+
+#     cls_cluster_dict_int, cluster_labels_text = conditional_clustering(
+#         N_CLUSTERS, VARIANCE, CNN, DEVICE
+#     )
+#     print(cls_cluster_dict_int, cluster_labels_text)
+# Example usage
 if __name__ == "__main__":
+    categories = CLASS_NAMES
+    split_ratio = 0.4  # 2 zeros per cluster
 
-    N_CLUSTERS = 2
-    VARIANCE = 0.95
-    CNN = "ViT-B/32"
-
-    # set device to either cuda, mps or cpu
-
-    DEVICE = torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps" if torch.backends.mps.is_available() else "cpu"
-    )
-
-    cls_cluster_dict_int, cluster_labels_text = conditional_clustering(
-        N_CLUSTERS, VARIANCE, CNN, DEVICE
-    )
-    print(cls_cluster_dict_int, cluster_labels_text)
+    cluster_rotator = rotating_cluster_generator_shift([i for i in range(len(categories))], split_ratio)
+    i=0
+    for c, arr in cluster_rotator:
+        if i<10:
+            print(arr)
+        else: 
+            break
+        i+=1
