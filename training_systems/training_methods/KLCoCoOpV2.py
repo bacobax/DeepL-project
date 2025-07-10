@@ -139,7 +139,6 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         inputs_novel = inputs_novel.to(self.device)
         targets_novel = targets_novel.to(self.device)
 
-        categories_novel_tensor = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
         with torch.no_grad():
             image_features_clip = self.model.clip_model.encode_image(inputs_novel)
             image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
@@ -154,9 +153,12 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             text_features_clip = text_features_clip / text_features_clip.norm(dim=-1, keepdim=True)
 
             clip_logits = image_features_clip @ text_features_clip.T
+        
+        print(f"CLIP LOGITS SHAPE: {clip_logits.shape}")
 
         self.model.train()
         student_logits, student_loss = self.model(inputs_novel, targets_novel)  # [B, num_classes]
+        print(f"STUDENT LOGITS SHAPE: {student_logits.shape}")
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
             torch.nn.functional.softmax(clip_logits, dim=-1),
