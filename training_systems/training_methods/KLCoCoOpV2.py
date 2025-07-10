@@ -101,24 +101,24 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         targets_base = targets.to(self.device)
         with self.model.temporary_classnames([CLASS_NAMES[c] for c in classes]):
             logits_base, loss_ce = self.model(inputs_base, targets_base)
-        # === Combine losses ===
-        if self.debug and batch_idx < 3:
-            print(f"[KLCoCoOpV2] LOGITS shape: {logits_base.shape}, TARGETS shape: {targets_base.shape}")
-            print(f"[KLCoCoOpV2] CE loss: {loss_ce.item()}")
-        loss_ce.backward()
+            # === Combine losses ===
+            if self.debug and batch_idx < 3:
+                print(f"[KLCoCoOpV2] LOGITS shape: {logits_base.shape}, TARGETS shape: {targets_base.shape}")
+                print(f"[KLCoCoOpV2] CE loss: {loss_ce.item()}")
+            loss_ce.backward()
 
-        self.optimizer_step()
-        batch_size_total = inputs_base.size(0)
+            self.optimizer_step()
+            batch_size_total = inputs_base.size(0)
 
-        metrics["ce_loss_metric"].update(loss_ce.item(), n=batch_size_total)
+            metrics["ce_loss_metric"].update(loss_ce.item(), n=batch_size_total)
 
-        _, predicted = logits_base.max(dim=1)
-        correct = (predicted == targets_base).sum().item()
-        total = targets_base.size(0)
-        metrics["ce_accuracy_metric"].update(correct, n=total, raw=True)
+            _, predicted = logits_base.max(dim=1)
+            correct = (predicted == targets_base).sum().item()
+            total = targets_base.size(0)
+            metrics["ce_accuracy_metric"].update(correct, n=total, raw=True)
 
-        if self.debug and batch_idx < 3:
-            print(f"[KLCoCoOpV2] Batch accuracy: {correct}/{total} = {correct/total if total > 0 else 0}")
+            if self.debug and batch_idx < 3:
+                print(f"[KLCoCoOpV2] Batch accuracy: {correct}/{total} = {correct/total if total > 0 else 0}")
         return {
             "ce_loss": loss_ce.item(),
             "accuracy": correct / targets_base.size(0),
@@ -168,15 +168,15 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             )
 
         # === Combine losses ===
-        kl_loss = self.lambda_kl * kl_loss
+            kl_loss = self.lambda_kl * kl_loss
 
-        if self.debug and batch_idx < 3:
-            print(f"[KLCoCoOpV2] KL loss (weighted): {kl_loss.item()}")
-        kl_loss.backward()
+            if self.debug and batch_idx < 3:
+                print(f"[KLCoCoOpV2] KL loss (weighted): {kl_loss.item()}")
+            kl_loss.backward()
 
-        self.optimizer_step()
+            self.optimizer_step()
 
-        metrics["kl_loss_metric"].update(kl_loss.item(), n=inputs_novel.size(0))
+            metrics["kl_loss_metric"].update(kl_loss.item(), n=inputs_novel.size(0))
 
         return {
             "kl_loss": kl_loss.item(),
