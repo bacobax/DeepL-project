@@ -5,6 +5,7 @@ between a model's predictions and a frozen teacher (e.g., CLIP) to enhance gener
 import random
 from typing import Dict, Any, Optional
 
+import clip
 import torch
 from torch.utils.data import DataLoader, Dataset
 
@@ -12,7 +13,7 @@ from training_systems.training_methods.DoubleDatasetTrainingMethod import Double
 from training_systems.training_methods.TrainingMethod import TrainingMethod
 
 from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
+from utils.datasets import CLASS_NAMES, ContiguousLabelDataset
 from utils.kl import get_kl_loss
 
 
@@ -137,7 +138,30 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         inputs_novel = inputs_novel.to(self.device)
         targets_novel = targets_novel.to(self.device)
-        kl_loss = get_kl_loss(self.device, inputs_novel, self.model, targets_novel, dataset)
+
+        categories_novel_tensor = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
+        with torch.no_grad():
+            image_features_clip = self.model.clip_model.encode_image(inputs_novel)
+            image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
+
+            category_idxs = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
+
+            text_inputs = clip.tokenize(
+                [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in category_idxs]
+            ).to(self.device)
+
+            text_features_clip = self.model.clip_model.encode_text(text_inputs)
+            text_features_clip = text_features_clip / text_features_clip.norm(dim=-1, keepdim=True)
+
+            clip_logits = image_features_clip @ text_features_clip.T
+
+        self.model.train()
+        student_logits, student_loss = self.model(inputs_novel, targets_novel)  # [B, num_classes]
+        kl_loss = torch.nn.functional.kl_div(
+            torch.nn.functional.log_softmax(student_logits, dim=-1),
+            torch.nn.functional.softmax(clip_logits, dim=-1),
+            reduction="batchmean"
+        )
 
         # === Combine losses ===
         kl_loss = self.lambda_kl * kl_loss
