@@ -7,6 +7,7 @@ import os
 import math
 from collections import Counter
 from copy import deepcopy
+from statistics import harmonic_mean
 
 import torch
 from easydict import EasyDict
@@ -440,9 +441,9 @@ class CoCoOpSystem:
             best_model_path (str): Path to store the best base model.
 
         Returns:
-            Tuple[int, float]: Final epoch index and best validation accuracy on novel classes.
+            Tuple[int, float]: Final epoch index and best validation score.
         """
-        best_novel_accuracy = 0.0
+        best_score = 0.0
         patience = 4
         patience_counter = 0
         c = 0
@@ -484,8 +485,11 @@ class CoCoOpSystem:
             )
 
             base_val_acc, novel_val_acc = self._evaluate_and_log(e)
-            if novel_val_acc > best_novel_accuracy:
-                best_novel_accuracy = novel_val_acc
+
+            score = harmonic_mean([base_val_acc, novel_val_acc])
+
+            if score > best_score:
+                best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
             else:
@@ -493,10 +497,12 @@ class CoCoOpSystem:
                 if patience_counter >= patience:
                     print(f"Early stopping at epoch {e}")
                     break
+
             self.lr_scheduler.step()
             pbar.set_postfix(
                 PB_val_acc=base_val_acc,
                 PN_val_acc=novel_val_acc,
+                score=score,
                 lr=self.optimizer.param_groups[0]["lr"],
                 ce_L=ce_loss,
                 kl_L=kl_loss,
@@ -505,7 +511,7 @@ class CoCoOpSystem:
             pbar.update(1)
             c += 1
 
-        return c, best_novel_accuracy
+        return c, best_score
 
     def _train_adversarial_phase(self, start_epoch, best_model_path):
         """
