@@ -160,14 +160,6 @@ class DoubleDatasetTrainingMethod:
         dataloader1 = self.get_data_loader1(tmp_dataset1, batch_size)
         dataloader2 = self.get_data_loader2(tmp_dataset2, batch_size)
 
-        pbar = tqdm(dataloader2, desc=f"Training-{self.title}/{names[1]}", position=1, leave=False)
-        for batch_idx, sample in enumerate(dataloader2):
-            debug_metrics = self.forward_backward2(sample, batch_idx, metrics, tmp_dataset2)
-            pbar.set_postfix(
-                self.debug_metrics_to_pbar_args2(debug_metrics)
-            )
-            pbar.update(1)
-        
         pbar = tqdm(dataloader1, desc=f"Training-{self.title}/{names[0]}", position=1, leave=False)
         for batch_idx, sample in enumerate(dataloader1):
             debug_metrics = self.forward_backward1(sample, batch_idx, metrics, tmp_dataset1)
@@ -177,6 +169,13 @@ class DoubleDatasetTrainingMethod:
             pbar.update(1)
 
         
+        pbar = tqdm(dataloader2, desc=f"Training-{self.title}/{names[1]}", position=1, leave=False)
+        for batch_idx, sample in enumerate(dataloader2):
+            debug_metrics = self.forward_backward2(sample, batch_idx, metrics, tmp_dataset2)
+            pbar.set_postfix(
+                self.debug_metrics_to_pbar_args2(debug_metrics)
+            )
+            pbar.update(1)       
 
         return self.training_step_return(metrics)
 
