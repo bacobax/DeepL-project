@@ -98,7 +98,7 @@ class TrainingMethod(ABC):
         pass
 
     @abstractmethod
-    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> list[float]:
         """
         Generate summary metrics after completing a training epoch.
 
@@ -146,42 +146,7 @@ class TrainingMethod(ABC):
             pbar.update(1)
         return self.training_step_return(metrics)
 
-    def get_forward_backward_functions(self) -> list[Callable]:
-        raise NotImplementedError("get_forward_backward_functions must be implemented by the child class")
 
-    def multiple_datasets_train_step(self, datasets, batch_size):
-        metrics = self.get_metrics()
-        self.start_training()
-        tmp_datasets = [ContiguousLabelDataset(dataset) for dataset in datasets]
-        # check if it's not a list of datasets, then make it a list of datasets
-        if not isinstance(tmp_datasets, list):
-            tmp_datasets = [tmp_datasets]
-
-        dataloaders = self.get_data_loader(tmp_datasets, batch_size)
-        # check if it's not a list of dataloaders, then make it a list of dataloaders
-        if not isinstance(dataloaders, list):
-            dataloaders = [dataloaders]
-
-        forward_backward_functions = self.get_forward_backward_functions()
-        assert len(forward_backward_functions) == len(dataloaders), "Number of forward_backward_functions must be equal to number of dataloaders"
-        c=0
-        for forward_backward_function, dataloader in zip(forward_backward_functions, dataloaders):
-            pbar = tqdm(dataloader, desc=f"Training-{self.title}-{c}", position=1, leave=False)
-            for batch_idx, sample in enumerate(dataloader):
-                debug_metrics = forward_backward_function(sample, batch_idx, metrics, tmp_datasets)
-                pbar.set_postfix(
-                    self.debug_metrics_to_pbar_args(debug_metrics)
-                )
-                pbar.update(1)
-            c+=1
-        pbar = tqdm(dataloaders, desc=f"Training-{self.title}", position=1, leave=False)
-        for batch_idx, sample in enumerate(dataloaders):
-            debug_metrics = self.forward_backward(sample, batch_idx, metrics, tmp_datasets)
-            pbar.set_postfix(
-                self.debug_metrics_to_pbar_args(debug_metrics)
-            )
-            pbar.update(1)
-        return self.training_step_return(metrics)
 
 
 

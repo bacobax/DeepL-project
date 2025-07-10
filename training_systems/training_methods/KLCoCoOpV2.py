@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from training_systems.training_methods.MultipleDatasetsTrainingMethod import DoubleDatasetTrainingMethod
+from training_systems.training_methods.DoubleDatasetTrainingMethod import DoubleDatasetTrainingMethod
 from training_systems.training_methods.TrainingMethod import TrainingMethod
 
 from utils.metrics import AverageMeter

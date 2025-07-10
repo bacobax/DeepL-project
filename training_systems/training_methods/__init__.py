@@ -1,6 +1,6 @@
 
 from training_systems.training_methods.TrainingMethod import TrainingMethod
-from training_systems.training_methods.MultipleDatasetsTrainingMethod import MultipleDatasetsTrainingMethod
+from training_systems.training_methods.DoubleDatasetTrainingMethod import DoubleDatasetTrainingMethod
 from training_systems.training_methods.Adversarial import Adversarial
 from training_systems.training_methods.KLAdversarial import KLAdversarial
 from training_systems.training_methods.KLCoCoOp import KLCoCoOp

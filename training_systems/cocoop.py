@@ -35,7 +35,7 @@ from training_systems.evaluation_methods import (
     EvalStep,
 )
 from utils.clustering import conditional_clustering, random_clustering
-from training_systems.training_methods.MultipleDatasetsTrainingMethod import DoubleDatasetTrainingMethod
+from training_systems.training_methods.DoubleDatasetTrainingMethod import DoubleDatasetTrainingMethod
 
 
 def checksum(model):
