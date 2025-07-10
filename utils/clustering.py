@@ -81,7 +81,12 @@ def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../da
     class_feature = {}
     with torch.no_grad():
         for c in tqdm(base_classes, desc="Processing classes"):
-            imgs_c = [img for img, label in train_base if label == c]
+            imgs_c = []
+            # Create a DataLoader to iterate over the dataset properly
+            dataloader = torch.utils.data.DataLoader(train_base, batch_size=1, shuffle=False)
+            for img, label in dataloader:
+                if label.item() == c:
+                    imgs_c.append(img.squeeze(0))
             features = [
                 clip_model.encode_image(img.unsqueeze(0).to(device)).cpu().numpy()
                 for img in imgs_c
@@ -228,8 +233,72 @@ def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data")
 
     return cluster_dict_int, cluster_labels_text
 
-def clusters_history(split_ratio: float):
-   pass
+def rotate_clusters(split_ratio: float, data_dir="../data"):
+    """
+    Creates a valid cluster configuration where split_ratio*N categories belong to cluster 0,
+    and the rest belong to cluster 1.
+    
+    Args:
+        split_ratio (float): Ratio of categories that should belong to cluster 0 (0 < split_ratio < 1)
+        data_dir (str): Directory where the dataset is stored
+        
+    Returns:
+        dict: Mapping from category index to cluster (0 or 1)
+    """
+    # Get the dataset to determine number of categories
+    train_set, _, _ = get_data(data_dir=data_dir)
+    base_classes, _ = base_novel_categories(train_set)
+    N = len(base_classes)
+    
+    # Calculate how many categories should be in cluster 0
+    n_zeros = int(N * split_ratio)
+    n_ones = N - n_zeros
+    
+    # Create the cluster assignment
+    cluster_assignments = {}
+    for i, category in enumerate(base_classes):
+        if i < n_zeros:
+            cluster_assignments[category] = 0
+        else:
+            cluster_assignments[category] = 1
+    
+    return cluster_assignments
+
+def clusters_history(split_ratio: float, data_dir="../data"):
+    """
+    Creates an array of all possible cluster configurations as heterogeneously as possible.
+    Each configuration follows the split_ratio constraint.
+    
+    Args:
+        split_ratio (float): Ratio of categories that should belong to cluster 0
+        data_dir (str): Directory where the dataset is stored
+        
+    Returns:
+        list: List of cluster configurations (each is a dict mapping category to cluster)
+    """
+    # Get the dataset to determine number of categories
+    train_set, _, _ = get_data(data_dir=data_dir)
+    base_classes, _ = base_novel_categories(train_set)
+    N = len(base_classes)
+    
+    # Calculate how many categories should be in cluster 0
+    n_zeros = int(N * split_ratio)
+    n_ones = N - n_zeros
+    
+    # Generate all possible combinations of n_zeros categories for cluster 0
+    from itertools import combinations
+    
+    all_clusters = []
+    for zero_indices in combinations(range(N), n_zeros):
+        cluster_config = {}
+        for i, category in enumerate(base_classes):
+            if i in zero_indices:
+                cluster_config[category] = 0
+            else:
+                cluster_config[category] = 1
+        all_clusters.append(cluster_config)
+    
+    return all_clusters
 
 
 # if __name__ == "__main__":
@@ -257,9 +326,11 @@ if __name__ == "__main__":
 
     cluster_rotator = rotating_cluster_generator_shift([i for i in range(len(categories))], split_ratio)
     i=0
-    for c, arr in cluster_rotator:
+    for cluster, cat0, cat1 in cluster_rotator:
         if i<10:
-            print(arr)
+            print(f"Cluster: {cluster}")
+            print(f"Cat0: {cat0}")
+            print(f"Cat1: {cat1}")
         else: 
             break
         i+=1

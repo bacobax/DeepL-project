@@ -99,12 +99,16 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # === Pseudo-base: cross-entropy ===
         inputs_base = inputs.to(self.device)
         targets_base = targets.to(self.device)
-        with self.model.temporary_classnames([CLASS_NAMES[c] for c in classes]):
+        # Use remapped class names to match the remapped labels
+        remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
+        with self.model.temporary_classnames(remapped_class_names):
             logits_base, loss_ce = self.model(inputs_base, targets_base)
             # === Combine losses ===
             if self.debug and batch_idx < 3:
                 print(f"[KLCoCoOpV2] LOGITS shape: {logits_base.shape}, TARGETS shape: {targets_base.shape}")
                 print(f"[KLCoCoOpV2] CE loss: {loss_ce.item()}")
+                print(f"[KLCoCoOpV2] Remapped class names: {remapped_class_names}")
+                print(f"[KLCoCoOpV2] Original classes: {classes}")
             loss_ce.backward()
 
             self.optimizer_step()
@@ -132,7 +136,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             dataset: ContiguousLabelDataset,
             classes: list[int]
     ) -> Dict[str, float]:
-        pseudo_novel_class_names = [CLASS_NAMES[c] for c in classes]
+        # Use remapped class names to match the remapped labels
+        remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
+        pseudo_novel_class_names = remapped_class_names
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
             print(f"[KLCoCoOpV2] Sample type: {type(sample)}; Sample len: {len(sample) if hasattr(sample, '__len__') else 'N/A'}")
@@ -159,7 +165,7 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
 
 
         self.model.train()
-        with self.model.temporary_classnames([CLASS_NAMES[c] for c in classes]):
+        with self.model.temporary_classnames(remapped_class_names):
             student_logits, student_loss = self.model(inputs_novel, targets_novel) 
             kl_loss = torch.nn.functional.kl_div(
                 torch.nn.functional.log_softmax(student_logits, dim=-1),
