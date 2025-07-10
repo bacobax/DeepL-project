@@ -136,7 +136,6 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         inputs_novel, targets_novel = sample
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         inputs_novel = inputs_novel.to(self.device)
-        targets_novel = targets_novel.to(self.device)
 
         kl_loss = get_kl_loss(self.device, inputs_novel, self.model, targets_novel, dataset)
 
