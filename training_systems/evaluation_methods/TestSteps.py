@@ -35,7 +35,7 @@ class ZeroShotTestStep(EvaluationMethod):
     def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset)
+        tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         # Remap labels into a contiguous set starting from zero
         self.walk(dataloader, accuracy_meter, desc_add)
@@ -76,7 +76,7 @@ class FineTunedTestStep(EvaluationMethod):
     def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset)
+        tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         new_classnames = [CLASS_NAMES[tmp_dataset.idx2cat[c]] for c in range(len(new_classnames))]
 

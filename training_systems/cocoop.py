@@ -475,11 +475,13 @@ class CoCoOpSystem:
                     total_loss, acc, ce_loss, kl_loss = method.train_step(
                         self.train_pseudo_base,
                         self.base_batch_size,
+                        classnames=self.pseudo_base_classes
                     )
             elif isinstance(method, BaseCoCoOp):
                 total_loss, acc = method.train_step(
                     self.train_pseudo_base,
                     self.base_batch_size,
+                    classnames=self.pseudo_base_classes
                 )
                 kl_loss = None
                 ce_loss = total_loss
@@ -567,11 +569,13 @@ class CoCoOpSystem:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.base_batch_size,
+                    classnames=self.base_classes
                 )
             else:
                 total_loss, acc, ce_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.adv_batch_size,
+                    classnames=self.base_classes
                 )
                 kl_loss = None
 

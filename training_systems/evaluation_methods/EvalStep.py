@@ -30,7 +30,7 @@ class EvalStep(EvaluationMethod):
         self.model.eval()
         loss_meter = AverageMeter()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset)
+        tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
 
         if new_classnames is not None:

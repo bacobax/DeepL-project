@@ -154,8 +154,8 @@ class DoubleDatasetTrainingMethod:
         assert len(names) == 2, "Number of names must be 2"
         metrics = self.get_metrics()
         self.start_training()
-        tmp_dataset1 = ContiguousLabelDataset(dataset1)
-        tmp_dataset2 = ContiguousLabelDataset(dataset2)
+        tmp_dataset1 = ContiguousLabelDataset(dataset1, classes1)
+        tmp_dataset2 = ContiguousLabelDataset(dataset2, classes2)
 
         dataloader1 = self.get_data_loader1(tmp_dataset1, batch_size)
         dataloader2 = self.get_data_loader2(tmp_dataset2, batch_size)

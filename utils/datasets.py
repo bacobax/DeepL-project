@@ -91,13 +91,11 @@ class ContiguousLabelDataset(torch.utils.data.Dataset):
         cat2idx (Dict[Any, int]): Mapping from original class labels to contiguous integer indices.
         idx2cat (Dict[int, Any]): Reverse mapping from indices back to original class labels.
     """
-    def __init__(self, dataset):
+    def __init__(self, dataset, class_order: list[int]):
         self.dataset = dataset
-        # Extract all labels from the dataset
-        labels = [label for _, label in dataset]
-        unique_labels = sorted(set(labels))
-        self.cat2idx = {cat: idx for idx, cat in enumerate(unique_labels)}
-        self.idx2cat = {idx: cat for cat, idx in self.cat2idx.items()}
+        # force the mapping to use your custom order
+        self.cat2idx = { cat: idx for idx, cat in enumerate(class_order) }
+        self.idx2cat = { idx: cat for cat, idx in self.cat2idx.items() }
 
     def __len__(self):
         return len(self.dataset)

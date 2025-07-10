@@ -122,7 +122,7 @@ class TrainingMethod(ABC):
         """
         self.model.train()
 
-    def train_step(self, dataset, batch_size):
+    def train_step(self, dataset, batch_size, classnames):
         """
         Perform a complete training epoch, including data loading, training, and metric collection.
 
@@ -135,7 +135,7 @@ class TrainingMethod(ABC):
         """
         metrics = self.get_metrics()
         self.start_training()
-        tmp_dataset = ContiguousLabelDataset(dataset)
+        tmp_dataset = ContiguousLabelDataset(dataset, classnames)
         dataloader = self.get_data_loader(tmp_dataset, batch_size)
         pbar = tqdm(dataloader, desc=f"Training-{self.title}", position=1, leave=False)
         for batch_idx, sample in enumerate(dataloader):

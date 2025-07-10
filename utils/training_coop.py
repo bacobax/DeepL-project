@@ -30,7 +30,7 @@ def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_c
     """
     model.eval()
 
-    tmp_dataset = ContiguousLabelDataset(dataset)
+    tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     total_loss = 0.0
@@ -101,7 +101,7 @@ def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device=
 
     model.train()
 
-    tmp_dataset = ContiguousLabelDataset(dataset)
+    tmp_dataset = ContiguousLabelDataset(dataset, classnames)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     pbar = tqdm(dataloader, desc="Training", position=1, leave=False)
     for batch_idx, (inputs, targets) in enumerate(dataloader):
@@ -181,7 +181,7 @@ def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, labe
     """
     model.eval()
 
-    tmp_dataset = ContiguousLabelDataset(dataset)
+    tmp_dataset = ContiguousLabelDataset(dataset, categories)
     dataloader = DataLoader(tmp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
     correct = 0
     total = 0
