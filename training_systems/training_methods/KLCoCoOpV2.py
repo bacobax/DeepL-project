@@ -148,7 +148,7 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             #category_idxs = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
 
             text_inputs = clip.tokenize(
-                [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in pseudo_novel_class_names]
+                [f"a photo of a {cn}, a type of flower." for cn in pseudo_novel_class_names]
             ).to(self.device)
 
             text_features_clip = self.model.clip_model.encode_text(text_inputs)
