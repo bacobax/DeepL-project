@@ -195,7 +195,7 @@ class CoCoOpSystem:
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
         self.cluster_generator = rotating_cluster_generator_shift(self.base_classes, self.pseudo_base_ratio)
-        _, self.pseudo_base_classes, self.pseudo_novel_classes = next(cluster_generator)
+        _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
 
         self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
         self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
