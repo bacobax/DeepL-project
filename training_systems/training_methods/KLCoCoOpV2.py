@@ -103,7 +103,7 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # classes contains original category indices, but we need to map them to 0-based indices
         # The ContiguousLabelDataset remaps labels to 0-based indices, so we need class names in the same order
         # Use the remapped indices to get class names in the correct order
-        remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
+        remapped_class_names = [ CLASS_NAMES[ dataset.idx2cat[i] ] for i in range(len(dataset.idx2cat)) ]
         assert set(classes) == set(dataset.idx2cat.values()), \
             f"Split classes ({classes}) != dataset labels ({list(dataset.idx2cat.values())})"
         with self.model.temporary_classnames(remapped_class_names):
@@ -151,7 +151,7 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # classes contains original category indices, but we need to map them to 0-based indices
         # The ContiguousLabelDataset remaps labels to 0-based indices, so we need class names in the same order
         # Use the remapped indices to get class names in the correct order
-        remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
+        remapped_class_names = [ CLASS_NAMES[ dataset.idx2cat[i] ] for i in range(len(dataset.idx2cat)) ]
         pseudo_novel_class_names = remapped_class_names
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
