@@ -5,6 +5,7 @@ Includes configuration, data loading, model preparation, and training logic for 
 
 import os
 import math
+from collections import Counter
 from copy import deepcopy
 
 import torch
@@ -14,7 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 import clip
-
+import random
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
@@ -99,6 +100,10 @@ class CoCoOpSystem:
             optimizer_configs is not None and len(optimizer_configs) == 2
         ), "Two optimizer configs must be provided"
 
+        # --- NEW: Pseudo-base/novel split param ---
+        self.pseudo_base_ratio = base_training_opt.get("pseudo_base_ratio", 0.7)
+        self.pseudo_split_seed = base_training_opt.get("pseudo_split_seed", 42)
+
         self.test_batch_size = test_batch_size
         self.device = device
         self.epochs = base_training_opt["epochs"]
@@ -169,26 +174,28 @@ class CoCoOpSystem:
 
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
+        # --- NEW: Pseudo-base/novel split ---
+   
+        base_classes_shuffled = self.base_classes.copy()
+        random.Random(self.pseudo_split_seed).shuffle(base_classes_shuffled)
+        n_pseudo_base = int(len(base_classes_shuffled) * self.pseudo_base_ratio)
+        self.pseudo_base_classes = sorted(base_classes_shuffled[:n_pseudo_base])
+        self.pseudo_novel_classes = sorted(base_classes_shuffled[n_pseudo_base:])
+
+        # Helper to split a dataset by class list
+        # (moved to method below)
+
+        # Split train_base/val_base into pseudo_base/pseudo_novel
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
 
-        if clustering_opt["use_random_clustering"]:
-            # Use random clustering
-            self.cls_cluster_dict, _ = random_clustering(
-                n_cluster=clustering_opt["n_clusters"],
-                seed=clustering_opt["seed"],
-                distribution="uniform",
-            )
-        else:
-            # Load clustering information
-            self.cls_cluster_dict, _ = conditional_clustering(
-                n_cluster=clustering_opt["n_clusters"],
-                variance=clustering_opt["variance"],
-                cnn=clustering_opt["vision_encoder"],
-                device=self.device,
-            )
+        self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
+        self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
+        self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
+        self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
 
+        # --- Model/classnames: only pseudo_base for first phase ---
         resolution = self.clip_model.visual.input_resolution
         ctx_load = (
             "./bin/coop/exp1_ctx_only.pth"
@@ -208,12 +215,13 @@ class CoCoOpSystem:
                 "INPUT": {"SIZE": [resolution, resolution]},
             }
         )
-
         self.model = CustomCLIP(
-            classnames=[CLASS_NAMES[idx] for idx in self.base_classes],
+
+            classnames=[CLASS_NAMES[idx] for idx in self.pseudo_base_classes],
             cfg=cfg,
             clip_model=self.clip_model,
         ).to(self.device)
+        print(f"[DEBUG] Model constructed with classnames: {[CLASS_NAMES[idx] for idx in self.pseudo_base_classes]}")
 
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
@@ -226,15 +234,42 @@ class CoCoOpSystem:
 
         clip_dim = self.clip_model.visual.output_dim
         print(f"ctx_dim: {self.clip_model.ln_final.weight.shape[0]}, ")
-        """self.mlp_adversary = AdversarialMLP(
-            input_dim=self.clip_model.ln_final.weight.shape[0] * self.n_ctx, opt=self.mlp_opt
-        ).to(self.device)"""
+
         self.mlp_adversary = AdversarialMLP(
             input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt
         ).to(self.device)
+        
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
+
+        # --- NEW: Cluster dict for adversarial phase ---
+
+        clustering_type = clustering_opt["clustering_type"]
+
+        if clustering_type == "random":
+            # Use random clustering
+            self.cls_cluster_dict, _ = random_clustering(
+                n_cluster=clustering_opt["n_clusters"],
+                seed=clustering_opt["seed"],
+                distribution="uniform",
+            )
+        elif clustering_type == "semantic": 
+            # Load clustering information
+            self.cls_cluster_dict, _ = conditional_clustering(
+                n_cluster=clustering_opt["n_clusters"],
+                variance=clustering_opt["variance"],
+                cnn=clustering_opt["vision_encoder"],
+                device=self.device,
+            )
+        elif clustering_type == "default":
+            # Pseudo_base: cluster 0, pseudo_novel: cluster 1
+            self.pseudo_cls_cluster_dict = {c: 0 for c in self.pseudo_base_classes}
+            self.pseudo_cls_cluster_dict.update({c: 1 for c in self.pseudo_novel_classes})
+            # For adversarial phase, use this dict
+            self.cls_cluster_dict = self.pseudo_cls_cluster_dict
+        else:
+            raise ValueError(f"Unknown clustering type: {clustering_type}")
 
     def _set_test_methods(self):
         """
@@ -249,6 +284,16 @@ class CoCoOpSystem:
             model=self.clip_model,
             batch_size=self.test_batch_size,
             categories=self.novel_classes,
+        )
+        self.zero_shot_pseudo_base_test_method = ZeroShotTestStep(
+            model=self.clip_model,
+            batch_size=self.test_batch_size,
+            categories=self.pseudo_base_classes,
+        )
+        self.zero_shot_pseudo_novel_test_method = ZeroShotTestStep(
+            model=self.clip_model,
+            batch_size=self.test_batch_size,
+            categories=self.pseudo_novel_classes,
         )
         self.finetuned_test_method = FineTunedTestStep(
             model=self.model,
@@ -269,8 +314,7 @@ class CoCoOpSystem:
         Initializes the training method used for both base and adversarial phases, depending on whether KL loss is enabled.
         Chooses between standard and KL-regularized training methods.
         """
-        self.adversarial_method = (
-            Adversarial(
+        self.adversarial_method = Adversarial(
                 lambda_adv=0.05,
                 model=self.model,
                 optimizer=self.optimizer,
@@ -278,19 +322,10 @@ class CoCoOpSystem:
                 grl=self.grl,
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
+                tmp_classes=self.base_classes,
             )
-            if not self.using_kl[1]
-            else KLAdversarial(
-                lambda_adv=0.05,
-                model=self.model,
-                optimizer=self.optimizer,
-                cls_cluster_dict=self.cls_cluster_dict,
-                grl=self.grl,
-                mlp_adversary=self.mlp_adversary,
-                lambda_kl=self.lambda_kl[1],
-                debug=self.debug,
-            )
-        )
+            
+        
         self.basic_train_method = (
             BaseCoCoOp(
                 model=self.model,
@@ -319,7 +354,9 @@ class CoCoOpSystem:
             # Base training phase
             base_end_epoch, _ = self._train_base_phase(best_model_path)
             if self.epochs != 0:
+                print(f"[DEBUG] Loading model state dict after base phase from: {best_model_path}")
                 self.model.load_state_dict(torch.load(best_model_path))
+                print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
                 self.save_model(path="./bin/cocoop", prefix="after_first_train_")
 
             if not self.skip_tests[1]:
@@ -334,8 +371,9 @@ class CoCoOpSystem:
         else:
             base_end_epoch = 0
             print("Skipping base training")
-            # Load the model from the checkpoint
+            print(f"[DEBUG] Loading model state dict from: {self.train_base_checkpoint_path}")
             self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
+            print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
 
         # Re-initialize test/eval/train methods after loading/training model and before adversarial phase
         self._set_eval_method()
@@ -399,12 +437,12 @@ class CoCoOpSystem:
 
             if self.using_kl[0]:
                 total_loss, acc, ce_loss, kl_loss = method.train_step(
-                    self.train_base,
+                    self.train_pseudo_base,
                     self.base_batch_size,
                 )
             else:
                 total_loss, acc = method.train_step(
-                    self.train_base,
+                    self.train_pseudo_base,
                     self.base_batch_size,
                 )
                 kl_loss = None
@@ -426,15 +464,16 @@ class CoCoOpSystem:
                 torch.save(self.model.state_dict(), best_model_path)
             else:
                 patience_counter += 1
-                # if patience_counter >= patience:
-                #     print(f"Early stopping at epoch {e}")
-                #     break
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {e}")
+                    break
             self.lr_scheduler.step()
             pbar.set_postfix(
+                base_val_acc=base_val_acc,
+                pseudo_novel_acc=novel_val_acc,
+                lr=self.optimizer.param_groups[0]["lr"],
                 ce_loss=ce_loss,
                 kl_loss=kl_loss,
-                base_val_acc=base_val_acc,
-                lr=self.optimizer.param_groups[0]["lr"],
                 pat_c=patience_counter,
             )
             pbar.update(1)
@@ -514,19 +553,21 @@ class CoCoOpSystem:
                 )
                 if novel_val_acc > best_novel_accuracy:
                     best_novel_accuracy = novel_val_acc
+                    print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
                     torch.save(self.model.state_dict(), best_model_path)
                     at_least_one_improving = True
                     patience_counter = 0
                 else:
                     patience_counter += 1
-                #     if patience_counter >= patience:
-                #         print(f"Early stopping adversarial at epoch {e}")
-                #         break
+                    if patience_counter >= patience:
+                        print(f"Early stopping adversarial at epoch {e}")
+                        break
                 pbar.set_postfix(
+                    base_val_acc=base_val_acc,
+                    pseudo_novel_acc=novel_val_acc,
                     ce_loss=ce_loss,
                     kl_loss=kl_loss,
                     adv_loss=adv_loss,
-                    base_val_acc=base_val_acc,
                     lr=self.optimizer.param_groups[0]["lr"],
                     pat_c=patience_counter,
                 )
@@ -538,15 +579,16 @@ class CoCoOpSystem:
             pbar.update(1)
 
         if at_least_one_improving and self.epochs != 0:
+            print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
             self.model.load_state_dict(torch.load(best_model_path))
-            print("Loaded best model from adversarial checkpoint.")
-
+            print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
+            print("Loaded best model from adversarial checkpoint (robust, filtered mismatched keys).")
         else:
             print(
                 "No improvement during second training. Using model from last adversarial epoch."
             )
             if last_model_state is not None:
-                self.model.load_state_dict(last_model_state)
+                self.model.load_state_dict(self.model.state_dict())
                 print("Loaded last adversarial model state.")
 
         return start_epoch + self.adv_training_epochs
@@ -562,18 +604,21 @@ class CoCoOpSystem:
         Returns:
             Tuple[float, float]: Accuracy for base and novel classes.
         """
+
         metrics_base = self.eval_method.evaluate(
-            dataset=self.val_base,
-            desc_add=" - Base",
+            dataset=self.val_pseudo_base,
+            desc_add=" - Pseudo Base",
         )
         base_val_loss = metrics_base["loss"]
         base_val_acc = metrics_base["accuracy"]
 
         metrics_novel = self.eval_method.evaluate(
-            dataset=self.val_novel,
-            new_classnames=self.novel_classes,
-            desc_add=" - Novel",
+
+            dataset=self.val_pseudo_novel,
+            new_classnames=self.pseudo_novel_classes,
+            desc_add=" - Pseudo Novel",
         )
+
         novel_val_loss = metrics_novel["loss"]
         novel_val_acc = metrics_novel["accuracy"]
 
@@ -637,30 +682,30 @@ class CoCoOpSystem:
         novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
         """
         if base:
-            base_metrics = self.zero_shot_base_classes_test_method.evaluate(
+            base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
                 dataset=self.test_base,
-                desc_add=" - Base Zerp Shot",
+                desc_add=" - Pseudo Base Zero Shot",
             )
-            novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
+            novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
                 dataset=self.test_novel,
-                desc_add=" - Novel Zero Shot",
+                desc_add=" - Pseudo Novel Zero Shot",
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
                 new_classnames=self.base_classes,
-                desc_add=" - Base Fine Tuned",
+                desc_add=" - Pseudo Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
                 new_classnames=self.novel_classes,
-                desc_add=" - Novel Fine Tuned",
+                desc_add=" - Pseudo Novel Fine Tuned",
             )
 
         base_accuracy = base_metrics["accuracy"]
         novel_accuracy = novel_metrics["accuracy"]
-        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "base_classes")
-        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "novel_classes")
+        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "pseudo_base_classes")
+        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "pseudo_novel_classes")
         return base_accuracy, novel_accuracy
 
     def save_model(self, path="./bin/cocoop", prefix=""):
@@ -672,9 +717,11 @@ class CoCoOpSystem:
             prefix (str): Filename prefix to distinguish models.
         """
         os.makedirs(path, exist_ok=True)
-        torch.save(
-            self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
-        )
+        print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
+        with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.base_classes]):
+            torch.save(
+                self.model.state_dict(), os.path.join(path, f"{prefix}{self.run_name}.pth")
+            )
 
     def save_mlp_adversary(self, path="./bin/cocoop", prefix=""):
         """
@@ -722,3 +769,7 @@ class CoCoOpSystem:
         return torch.optim.SGD(
             params, weight_decay=config.weight_decay, momentum=config.momentum
         )
+
+    def split_by_classes(self, dataset, class_list):
+        idxs = [i for i, (_, label) in enumerate(dataset) if label in class_list]
+        return torch.utils.data.Subset(dataset, idxs)

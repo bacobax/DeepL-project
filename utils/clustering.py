@@ -89,6 +89,7 @@ def random_clustering(
     seed=42,
     data_dir="../data",
     distribution="uniform",
+    split_ratio=0.7,  # Only for bipartite
 ):
     """
     Generates random cluster assignments for a given number of clusters.
@@ -97,43 +98,46 @@ def random_clustering(
         n_cluster (int): Number of clusters to generate.
         seed (int): Random seed for reproducibility.
         data_dir (str): Directory where the dataset is stored.
-        distribution (str): Distribution type for cluster assignment. Options are "uniform", "random", or "sequential".
+        distribution (str): Distribution type for cluster assignment. Options are "uniform", "random", "sequential", or "bipartite".
+        split_ratio (float): Percentage of classes in the larger cluster (only used for "bipartite").
+
     Returns:
-        Tuple[Dict[int, int], Dict[str, int]]: Two dictionaries mapping class indices and class names to cluster IDs.
+        Tuple[
+            Dict[int, int],        # class_id -> cluster_id
+            Dict[str, int],        # class_name -> cluster_id
+            List[int],             # class_ids in cluster 0
+            List[int],             # class_ids in cluster 1
+        ]
     """
 
     np.random.seed(seed)
     train_set, _, _ = get_data(data_dir=data_dir)
     base_classes, _ = base_novel_categories(train_set)
 
-    # split train_base into n_cluster clusters
     cluster_labels = {}
+
     if distribution == "uniform":
         shuffled = np.random.permutation(base_classes)
-
         for i, cls in enumerate(shuffled):
-            cluster_labels[cls] = i % n_cluster
+            cluster_id = i % n_cluster
+            cluster_labels[cls] = cluster_id
+
     elif distribution == "random":
-        cluster_labels = {
-            base_class: np.random.choice(range(n_cluster))
-            for base_class in base_classes
-        }
+        for cls in base_classes:
+            cluster_id = np.random.choice(range(n_cluster))
+            cluster_labels[cls] = cluster_id
+
     elif distribution == "sequential":
-        cluster_labels = {
-            base_class: i % n_cluster for i, base_class in enumerate(base_classes)
-        }
-    else:
-        raise ValueError(f"Unknown distribution: {distribution}")
+        for i, cls in enumerate(base_classes):
+            cluster_id = i % n_cluster
+            cluster_labels[cls] = cluster_id
 
     cluster_labels_text = {
-        CLASS_NAMES[base_class]: int(cluster)
-        for base_class, cluster in enumerate(cluster_labels.values())
+        CLASS_NAMES[cls]: int(cluster_labels[cls])
+        for cls in cluster_labels
     }
 
     cluster_dict_int = {int(k): v for k, v in cluster_labels.items()}
-
-    # reset the random seed
-    np.random.seed(None)
 
     return cluster_dict_int, cluster_labels_text
 
