@@ -78,7 +78,7 @@ class FineTunedTestStep(EvaluationMethod):
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
-        new_classnames = [CLASS_NAMES[c] for c in new_classnames]
+        new_classnames = [CLASS_NAMES[dataset.idx2cat[c]] for c in range(len(new_classnames))]
 
         with self.model.temporary_classnames(new_classnames):
             for images, targets in tqdm(dataloader, desc="Test (FineTuned) " + desc_add, position=1, leave=False):
