@@ -65,6 +65,8 @@ class CoCoOpSystem:
         self,
         *,
         test_batch_size=16,
+        pseudo_base_ratio=0.7,
+        pseudo_split_seed=42,
         device="cuda",
         run_name="exp1",
         cnn_model="ViT-B/32",
@@ -78,7 +80,7 @@ class CoCoOpSystem:
         adv_training_opt=None,
         base_training_opt=None,
         clustering_opt=None,
-        double_datasets_kl=False,
+
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -104,8 +106,8 @@ class CoCoOpSystem:
         ), "Two optimizer configs must be provided"
 
         # --- NEW: Pseudo-base/novel split param ---
-        self.pseudo_base_ratio = base_training_opt.get("pseudo_base_ratio", 0.7)
-        self.pseudo_split_seed = base_training_opt.get("pseudo_split_seed", 42)
+        self.pseudo_base_ratio = pseudo_base_ratio
+        self.pseudo_split_seed = pseudo_split_seed
 
         self.test_batch_size = test_batch_size
         self.device = device
@@ -116,6 +118,7 @@ class CoCoOpSystem:
         self.class_token_position = prompt_learner_opt["class_token_position"]
         self.csc = prompt_learner_opt["csc"]
         self.lambda_kl = kl_loss_opt["lambda_kl"]
+        self.double_datasets_kl = kl_loss_opt.get("double_datasets_kl", False)
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
@@ -135,7 +138,7 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
-        self.double_datasets_kl = double_datasets_kl
+
         print(
             "BATCH SIZES: ",
             self.test_batch_size,
@@ -329,12 +332,15 @@ class CoCoOpSystem:
             )
             
         if self.using_kl[0]:
+            if self.double_datasets_kl:
                 self.basic_train_method = KLCoCoOpV2(
                     model=self.model,
                     optimizer=self.optimizer,
                     debug=self.debug,
                     lambda_kl=self.lambda_kl[0],
-                ) if self.double_datasets_kl else KLCoCoOp(
+                )
+            else:
+                self.basic_train_method = KLCoCoOp(
                     model=self.model,
                     optimizer=self.optimizer,
                     debug=self.debug,
@@ -700,28 +706,28 @@ class CoCoOpSystem:
         if base:
             base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
                 dataset=self.test_base,
-                desc_add=" - Pseudo Base Zero Shot",
+                desc_add=" - Base Zero Shot",
             )
             novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
                 dataset=self.test_novel,
-                desc_add=" - Pseudo Novel Zero Shot",
+                desc_add=" - Novel Zero Shot",
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
                 new_classnames=self.base_classes,
-                desc_add=" - Pseudo Base Fine Tuned",
+                desc_add=" - Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
                 new_classnames=self.novel_classes,
-                desc_add=" - Pseudo Novel Fine Tuned",
+                desc_add=" - Novel Fine Tuned",
             )
 
         base_accuracy = base_metrics["accuracy"]
         novel_accuracy = novel_metrics["accuracy"]
-        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "pseudo_base_classes")
-        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "pseudo_novel_classes")
+        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "base_classes")
+        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "novel_classes")
         return base_accuracy, novel_accuracy
 
     def save_model(self, path="./bin/cocoop", prefix=""):

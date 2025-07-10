@@ -34,6 +34,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
     ) -> None:
         super().__init__(model, optimizer, "Base CoCoOp + KL", debug)
         self.lambda_kl = lambda_kl
+        if self.debug:
+            print(f"[KLCoCoOpV2] Initialized with lambda_kl={self.lambda_kl}, device={self.device}")
 
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
@@ -43,6 +45,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         Returns:
             Dict[str, AverageMeter]: Dictionary of metric names mapped to their respective AverageMeter instances.
         """
+        if self.debug:
+            print("[KLCoCoOpV2] Initializing metrics.")
         return {
             "ce_loss_metric": AverageMeter(),   
             "kl_loss_metric": AverageMeter(),
@@ -60,7 +64,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         Returns:
             DataLoader: PyTorch DataLoader with a custom collate function to separate base and novel samples.
         """
-        
+        if self.debug:
+            print(f"[KLCoCoOpV2] Creating DataLoader1 for pseudo_base with batch_size={batch_size}.")
         return DataLoader(
             pseudo_base,
             batch_size=batch_size,
@@ -72,6 +77,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         """
         Returns a DataLoader that splits each batch into pseudo-base and pseudo-novel subsets.
         """
+        if self.debug:
+            print(f"[KLCoCoOpV2] Creating DataLoader2 for pseudo_novel with batch_size={batch_size}.")
         return DataLoader(pseudo_novel_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
 
     
@@ -82,7 +89,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
-        
+        if self.debug and batch_idx < 3:
+            print(f"[KLCoCoOpV2] forward_backward1: batch_idx={batch_idx}")
+            print(f"[KLCoCoOpV2] Sample type: {type(sample)}")
         # Load data into GPU
         inputs, targets = sample
         # === Pseudo-base: cross-entropy ===
@@ -91,7 +100,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
 
         logits_base, loss_ce = self.model(inputs_base, targets_base)
         # === Combine losses ===
-        print("SHAPES LOGITS: ",logits_base.shape, targets_base.shape)
+        if self.debug and batch_idx < 3:
+            print(f"[KLCoCoOpV2] LOGITS shape: {logits_base.shape}, TARGETS shape: {targets_base.shape}")
+            print(f"[KLCoCoOpV2] CE loss: {loss_ce.item()}")
         loss_ce.backward()
 
         self.optimizer_step()
@@ -104,6 +115,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         total = targets_base.size(0)
         metrics["ce_accuracy_metric"].update(correct, n=total, raw=True)
 
+        if self.debug and batch_idx < 3:
+            print(f"[KLCoCoOpV2] Batch accuracy: {correct}/{total} = {correct/total if total > 0 else 0}")
         return {
             "ce_loss": loss_ce.item(),
             "accuracy": correct / targets_base.size(0),
@@ -116,7 +129,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
-      
+        if self.debug and batch_idx < 3:
+            print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
+            print(f"[KLCoCoOpV2] Sample type: {type(sample)}; Sample len: {len(sample) if hasattr(sample, '__len__') else 'N/A'}")
         # Load data into GPU
         novel_batch = sample
 
@@ -129,6 +144,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # === Combine losses ===
         kl_loss = self.lambda_kl * kl_loss
 
+        if self.debug and batch_idx < 3:
+            print(f"[KLCoCoOpV2] KL loss (weighted): {kl_loss.item()}")
         kl_loss.backward()
 
         self.optimizer_step()
@@ -149,12 +166,16 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         Returns:
             Dict[str, float]: Same metrics for direct display.
         """
+        if self.debug:
+            print(f"[KLCoCoOpV2] debug_metrics_to_pbar_args1: {debug_metrics}")
         return debug_metrics
 
     def debug_metrics_to_pbar_args2(self, debug_metrics: Dict[str, float]) -> Dict[str, float]:
         """
         Prepares debug metrics for visualization in progress bars or logs.
         """
+        if self.debug:
+            print(f"[KLCoCoOpV2] debug_metrics_to_pbar_args2: {debug_metrics}")
         return debug_metrics
 
     def training_step_return(self, metrics: Dict[str, AverageMeter]) -> list[float]:
@@ -167,6 +188,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         Returns:
             List[float]: Averages of total loss, accuracy, CE loss, and KL loss.
         """
+        if self.debug:
+            print(f"[KLCoCoOpV2] training_step_return: KL={metrics['kl_loss_metric'].avg}, CE={metrics['ce_loss_metric'].avg}, Acc={metrics['ce_accuracy_metric'].avg}")
         return [
             metrics["kl_loss_metric"].avg,
             metrics["ce_loss_metric"].avg,
