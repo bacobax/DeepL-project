@@ -168,6 +168,9 @@ class CoCoOpSystem:
                 "cnn_model": self.cnn_model,
                 "grl_lambda": self.grl_lambda,
                 "prompt_learner_warmup_epochs" : self.prompt_learner_warmup_epochs,
+                "double_datasets_kl": self.double_datasets_kl,
+                "pseudo_base_ratio": self.pseudo_base_ratio,
+                "pseudo_split_seed": self.pseudo_split_seed,
             }
         )
 
