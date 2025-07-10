@@ -133,11 +133,10 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
             print(f"[KLCoCoOpV2] Sample type: {type(sample)}; Sample len: {len(sample) if hasattr(sample, '__len__') else 'N/A'}")
         # Load data into GPU
-        novel_batch = sample
-
+        inputs_novel, targets_novel = sample
         # === Pseudo-novel: KL divergence with frozen CLIP ===
-        inputs_novel = torch.stack([img for img, _ in novel_batch]).to(self.device)
-        targets_novel = torch.tensor([lbl for _, lbl in novel_batch]).to(self.device)
+        inputs_novel = inputs_novel.to(self.device)
+        targets_novel = targets_novel.to(self.device)
 
         kl_loss = get_kl_loss(self.device, inputs_novel, self.model, targets_novel, dataset)
 
