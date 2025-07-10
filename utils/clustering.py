@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 import torch
-from datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 import clip
 import os
 import pickle
