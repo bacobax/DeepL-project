@@ -27,6 +27,7 @@ from training_systems.training_methods import (
     KLAdversarial,
     KLCoCoOp,
     BaseCoCoOp,
+    KLCoCoOpV2,
 )
 from training_systems.evaluation_methods import (
     ZeroShotTestStep,
@@ -34,6 +35,7 @@ from training_systems.evaluation_methods import (
     EvalStep,
 )
 from utils.clustering import conditional_clustering, random_clustering
+from training_systems.training_methods.MultipleDatasetsTrainingMethod import DoubleDatasetTrainingMethod
 
 
 def checksum(model):
@@ -76,6 +78,7 @@ class CoCoOpSystem:
         adv_training_opt=None,
         base_training_opt=None,
         clustering_opt=None,
+        double_datasets_kl=False,
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -132,7 +135,7 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
-
+        self.double_datasets_kl = double_datasets_kl
         print(
             "BATCH SIZES: ",
             self.test_batch_size,
@@ -322,24 +325,29 @@ class CoCoOpSystem:
                 grl=self.grl,
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
-                tmp_classes=self.base_classes,
+                tmp_classes=self.base_classes, 
             )
             
+        if self.using_kl[0]:
+                self.basic_train_method = KLCoCoOpV2(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    debug=self.debug,
+                    lambda_kl=self.lambda_kl[0],
+                ) if self.double_datasets_kl else KLCoCoOp(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    debug=self.debug,
+                    lambda_kl=self.lambda_kl[0],
+                )
+        else:
+            self.basic_train_method = BaseCoCoOp(
+                model=self.model,
+                optimizer=self.optimizer,
+                debug=self.debug,
+            )
+
         
-        self.basic_train_method = (
-            BaseCoCoOp(
-                model=self.model,
-                optimizer=self.optimizer,
-                debug=self.debug,
-            )
-            if not self.using_kl[0]
-            else KLCoCoOp(
-                model=self.model,
-                optimizer=self.optimizer,
-                debug=self.debug,
-                lambda_kl=self.lambda_kl[0],
-            )
-        )
 
     def train(self):
         """
@@ -436,11 +444,19 @@ class CoCoOpSystem:
         for e in range(self.max_epoch):
 
             if self.using_kl[0]:
-                total_loss, acc, ce_loss, kl_loss = method.train_step(
-                    self.train_pseudo_base,
-                    self.base_batch_size,
-                )
-            else:
+                if isinstance(method, DoubleDatasetTrainingMethod):
+                    total_loss, acc, ce_loss, kl_loss = method.double_datasets_train_step(
+                        self.train_pseudo_base,
+                        self.train_pseudo_novel,
+                        self.base_batch_size,
+                        ["pseudo_base", "pseudo_novel KL"],
+                    )
+                else:
+                    total_loss, acc, ce_loss, kl_loss = method.train_step(
+                        self.train_pseudo_base,
+                        self.base_batch_size,
+                    )
+            elif isinstance(method, BaseCoCoOp):
                 total_loss, acc = method.train_step(
                     self.train_pseudo_base,
                     self.base_batch_size,

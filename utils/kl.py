@@ -19,7 +19,7 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     Returns:
         Tensor: A scalar tensor representing the KL divergence loss.
     """
-    targets_novel_tensor = torch.tensor(targets_novel).to(device)
+    targets_novel_tensor = torch.tensor(targets_novel).to(device) if isinstance(targets_novel, list) else targets_novel
     categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
     # print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
     with torch.no_grad():
