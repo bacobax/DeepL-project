@@ -155,13 +155,11 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             text_features_clip = text_features_clip / text_features_clip.norm(dim=-1, keepdim=True)
 
             clip_logits = image_features_clip @ text_features_clip.T
-        
-        print(f"CLIP LOGITS SHAPE: {clip_logits.shape}")
+
 
         self.model.train()
         with self.model.temporary_classnames(pseudo_novel_class_names):
-            student_logits, student_loss = self.model(inputs_novel, targets_novel)  # [B, num_classes]
-            print(f"STUDENT LOGITS SHAPE: {student_logits.shape}")
+            student_logits, student_loss = self.model(inputs_novel, targets_novel) 
             kl_loss = torch.nn.functional.kl_div(
                 torch.nn.functional.log_softmax(student_logits, dim=-1),
                 torch.nn.functional.softmax(clip_logits, dim=-1),
