@@ -100,6 +100,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         inputs_base = inputs.to(self.device)
         targets_base = targets.to(self.device)
         # Use remapped class names to match the remapped labels
+        # classes contains original category indices, but we need to map them to 0-based indices
+        # The ContiguousLabelDataset remaps labels to 0-based indices, so we need class names in the same order
+        # Use the remapped indices to get class names in the correct order
         remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
         with self.model.temporary_classnames(remapped_class_names):
             logits_base, loss_ce = self.model(inputs_base, targets_base)
@@ -109,6 +112,12 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
                 print(f"[KLCoCoOpV2] CE loss: {loss_ce.item()}")
                 print(f"[KLCoCoOpV2] Remapped class names: {remapped_class_names}")
                 print(f"[KLCoCoOpV2] Original classes: {classes}")
+                print(f"[KLCoCoOpV2] Targets: {targets_base}")
+                print(f"[KLCoCoOpV2] Logits max: {logits_base.max(dim=1)[1]}")
+                print(f"[KLCoCoOpV2] Dataset cat2idx: {dataset.cat2idx}")
+                print(f"[KLCoCoOpV2] Dataset idx2cat: {dataset.idx2cat}")
+                print(f"[KLCoCoOpV2] Expected class names order: {[CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]}")
+                print(f"[KLCoCoOpV2] Model class names: {[CLASS_NAMES[c] for c in classes]}")
             loss_ce.backward()
 
             self.optimizer_step()
@@ -137,6 +146,9 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             classes: list[int]
     ) -> Dict[str, float]:
         # Use remapped class names to match the remapped labels
+        # classes contains original category indices, but we need to map them to 0-based indices
+        # The ContiguousLabelDataset remaps labels to 0-based indices, so we need class names in the same order
+        # Use the remapped indices to get class names in the correct order
         remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
         pseudo_novel_class_names = remapped_class_names
         if self.debug and batch_idx < 3:
