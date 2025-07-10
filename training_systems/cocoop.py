@@ -495,11 +495,11 @@ class CoCoOpSystem:
                     break
             self.lr_scheduler.step()
             pbar.set_postfix(
-                base_val_acc=base_val_acc,
-                pseudo_novel_acc=novel_val_acc,
+                PB_val_acc=base_val_acc,
+                PN_val_acc=novel_val_acc,
                 lr=self.optimizer.param_groups[0]["lr"],
-                ce_loss=ce_loss,
-                kl_loss=kl_loss,
+                ce_L=ce_loss,
+                kl_L=kl_loss,
                 pat_c=patience_counter,
             )
             pbar.update(1)
@@ -589,11 +589,11 @@ class CoCoOpSystem:
                         print(f"Early stopping adversarial at epoch {e}")
                         break
                 pbar.set_postfix(
-                    base_val_acc=base_val_acc,
-                    pseudo_novel_acc=novel_val_acc,
-                    ce_loss=ce_loss,
-                    kl_loss=kl_loss,
-                    adv_loss=adv_loss,
+                    PB_val_acc=base_val_acc,
+                    PN_val_acc=novel_val_acc,
+                    ce_L=ce_loss,
+                    kl_L=kl_loss,
+                    adv_L=adv_loss,
                     lr=self.optimizer.param_groups[0]["lr"],
                     pat_c=patience_counter,
                 )
