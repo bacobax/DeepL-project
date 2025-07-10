@@ -88,7 +88,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            classes: list[int]
     ) -> Dict[str, float]:
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] forward_backward1: batch_idx={batch_idx}")
@@ -98,8 +99,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # === Pseudo-base: cross-entropy ===
         inputs_base = inputs.to(self.device)
         targets_base = targets.to(self.device)
-
-        logits_base, loss_ce = self.model(inputs_base, targets_base)
+        with self.model.temporary_classnames([CLASS_NAMES[c] for c in classes]):
+            logits_base, loss_ce = self.model(inputs_base, targets_base)
         # === Combine losses ===
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] LOGITS shape: {logits_base.shape}, TARGETS shape: {targets_base.shape}")
@@ -128,10 +129,10 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            classes: list[int]
     ) -> Dict[str, float]:
-        all_pseudo_novel_classes = [item[0] for item in dataset.cat2idx.items()]
-        pseudo_novel_class_names = [CLASS_NAMES[c] for c in all_pseudo_novel_classes]
+        pseudo_novel_class_names = [CLASS_NAMES[c] for c in classes]
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
             print(f"[KLCoCoOpV2] Sample type: {type(sample)}; Sample len: {len(sample) if hasattr(sample, '__len__') else 'N/A'}")
@@ -158,7 +159,7 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
 
 
         self.model.train()
-        with self.model.temporary_classnames(pseudo_novel_class_names):
+        with self.model.temporary_classnames([CLASS_NAMES[c] for c in classes]):
             student_logits, student_loss = self.model(inputs_novel, targets_novel) 
             kl_loss = torch.nn.functional.kl_div(
                 torch.nn.functional.log_softmax(student_logits, dim=-1),

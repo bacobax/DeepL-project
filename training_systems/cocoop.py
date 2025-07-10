@@ -467,6 +467,8 @@ class CoCoOpSystem:
                         self.train_pseudo_novel,
                         self.base_batch_size,
                         ["pseudo_base", "pseudo_novel KL"],
+                        self.pseudo_base_classes,
+                        self.pseudo_novel_classes,
                     )
                     total_loss = ce_loss + kl_loss
                 else:
@@ -646,6 +648,7 @@ class CoCoOpSystem:
 
         metrics_base = self.eval_method.evaluate(
             dataset=self.val_pseudo_base,
+            new_classnames=self.pseudo_base_classes,
             desc_add=" - Pseudo Base",
         )
         base_val_loss = metrics_base["loss"]

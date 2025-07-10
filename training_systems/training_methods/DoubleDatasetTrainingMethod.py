@@ -126,7 +126,7 @@ class DoubleDatasetTrainingMethod:
 
     @abstractmethod
     def forward_backward1(
-            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset
+            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset, classes: list[int]
     ) -> Dict[str, float]:
         """
         Execute forward and backward pass, compute loss, and update metrics.
@@ -144,13 +144,13 @@ class DoubleDatasetTrainingMethod:
 
     @abstractmethod
     def forward_backward2(
-            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset
+            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset, classes: list[int]
     ) -> Dict[str, float]:
         """
         Execute forward and backward pass, compute loss, and update metrics.
         """
 
-    def double_datasets_train_step(self, dataset1, dataset2, batch_size, names: list[str]):
+    def double_datasets_train_step(self, dataset1, dataset2, batch_size, names: list[str], classes1, classes2):
         assert len(names) == 2, "Number of names must be 2"
         metrics = self.get_metrics()
         self.start_training()
@@ -162,7 +162,7 @@ class DoubleDatasetTrainingMethod:
 
         pbar = tqdm(dataloader1, desc=f"Training-{self.title}/{names[0]}", position=1, leave=False)
         for batch_idx, sample in enumerate(dataloader1):
-            debug_metrics = self.forward_backward1(sample, batch_idx, metrics, tmp_dataset1)
+            debug_metrics = self.forward_backward1(sample, batch_idx, metrics, tmp_dataset1, classes1)
             pbar.set_postfix(
                 self.debug_metrics_to_pbar_args1(debug_metrics)
             )
@@ -171,7 +171,7 @@ class DoubleDatasetTrainingMethod:
         
         pbar = tqdm(dataloader2, desc=f"Training-{self.title}/{names[1]}", position=1, leave=False)
         for batch_idx, sample in enumerate(dataloader2):
-            debug_metrics = self.forward_backward2(sample, batch_idx, metrics, tmp_dataset2)
+            debug_metrics = self.forward_backward2(sample, batch_idx, metrics, tmp_dataset2, classes2)
             pbar.set_postfix(
                 self.debug_metrics_to_pbar_args2(debug_metrics)
             )
