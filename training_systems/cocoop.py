@@ -454,12 +454,13 @@ class CoCoOpSystem:
 
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
-                    total_loss, acc, ce_loss, kl_loss = method.double_datasets_train_step(
+                    kl_loss, ce_loss, acc = method.double_datasets_train_step(
                         self.train_pseudo_base,
                         self.train_pseudo_novel,
                         self.base_batch_size,
                         ["pseudo_base", "pseudo_novel KL"],
                     )
+                    total_loss = ce_loss + kl_loss
                 else:
                     total_loss, acc, ce_loss, kl_loss = method.train_step(
                         self.train_pseudo_base,
