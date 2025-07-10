@@ -104,6 +104,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         # The ContiguousLabelDataset remaps labels to 0-based indices, so we need class names in the same order
         # Use the remapped indices to get class names in the correct order
         remapped_class_names = [CLASS_NAMES[dataset.idx2cat[i]] for i in range(len(classes))]
+        assert set(classes) == set(dataset.idx2cat.values()), \
+            f"Split classes ({classes}) != dataset labels ({list(dataset.idx2cat.values())})"
         with self.model.temporary_classnames(remapped_class_names):
             logits_base, loss_ce = self.model(inputs_base, targets_base)
             # === Combine losses ===
