@@ -130,6 +130,8 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             metrics: Dict[str, AverageMeter],
             dataset: ContiguousLabelDataset
     ) -> Dict[str, float]:
+        all_pseudo_novel_classes = [item[0] for item in dataset.cat2idx.items()]
+        pseudo_novel_class_names = [CLASS_NAMES[c] for c in all_pseudo_novel_classes]
         if self.debug and batch_idx < 3:
             print(f"[KLCoCoOpV2] forward_backward2: batch_idx={batch_idx}")
             print(f"[KLCoCoOpV2] Sample type: {type(sample)}; Sample len: {len(sample) if hasattr(sample, '__len__') else 'N/A'}")
@@ -143,10 +145,10 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             image_features_clip = self.model.clip_model.encode_image(inputs_novel)
             image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
 
-            category_idxs = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
+            #category_idxs = [dataset.idx2cat[c.item()] for c in list(set(targets_novel))] # type: ignore
 
             text_inputs = clip.tokenize(
-                [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in category_idxs]
+                [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in pseudo_novel_class_names]
             ).to(self.device)
 
             text_features_clip = self.model.clip_model.encode_text(text_inputs)
@@ -157,13 +159,14 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
         print(f"CLIP LOGITS SHAPE: {clip_logits.shape}")
 
         self.model.train()
-        student_logits, student_loss = self.model(inputs_novel, targets_novel)  # [B, num_classes]
-        print(f"STUDENT LOGITS SHAPE: {student_logits.shape}")
-        kl_loss = torch.nn.functional.kl_div(
-            torch.nn.functional.log_softmax(student_logits, dim=-1),
-            torch.nn.functional.softmax(clip_logits, dim=-1),
-            reduction="batchmean"
-        )
+        with self.model.temporary_classnames(pseudo_novel_class_names):
+            student_logits, student_loss = self.model(inputs_novel, targets_novel)  # [B, num_classes]
+            print(f"STUDENT LOGITS SHAPE: {student_logits.shape}")
+            kl_loss = torch.nn.functional.kl_div(
+                torch.nn.functional.log_softmax(student_logits, dim=-1),
+                torch.nn.functional.softmax(clip_logits, dim=-1),
+                reduction="batchmean"
+            )
 
         # === Combine losses ===
         kl_loss = self.lambda_kl * kl_loss
