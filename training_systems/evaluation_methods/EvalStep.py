@@ -34,7 +34,7 @@ class EvalStep(EvaluationMethod):
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
 
         if new_classnames is not None:
-            new_classnames = [CLASS_NAMES[dataset.idx2cat[c]] for c in range(len(new_classnames))]
+            new_classnames = [CLASS_NAMES[tmp_dataset.idx2cat[c]] for c in range(len(new_classnames))]
 
             with self.model.temporary_classnames(new_classnames):
                 self.walk(loss_meter, accuracy_meter, dataloader, desc_add)
