@@ -11,9 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from training_systems.core import DoubleDatasetTrainingMethod
 
-from utils.metrics import AverageMeter
-from utils.datasets import CLASS_NAMES, ContiguousLabelDataset
-from utils.kl import get_kl_loss
+from utils import AverageMeter,CLASS_NAMES, ContiguousLabelDataset, get_kl_loss
 
 
 class KLCoCoOpV2(DoubleDatasetTrainingMethod):

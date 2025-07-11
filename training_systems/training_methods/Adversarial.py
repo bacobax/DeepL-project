@@ -9,9 +9,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
 from training_systems.core import TrainingMethod
-from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
-from utils.datasets import CLASS_NAMES
+from utils import AverageMeter, ContiguousLabelDataset, CLASS_NAMES
 from model.cocoop.mlp_adversary import AdversarialMLP, GradientReversalLayer
 
 

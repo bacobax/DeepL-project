@@ -20,7 +20,29 @@ import hashlib
 
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
-from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
+from utils import (
+    conditional_clustering,
+    random_clustering,
+    rotating_cluster_generator_shift,
+    get_data,
+    base_novel_categories,
+    split_data,
+    TensorboardLogger,
+    CLASS_NAMES
+)
+
+from training_systems.training_methods import (
+    Adversarial,
+    KLCoCoOp,
+    BaseCoCoOp,
+    KLCoCoOpV2,
+)
+from training_systems.evaluation_methods import (
+    ZeroShotTestStep,
+    FineTunedTestStep,
+    EvalStep,
+)
+from training_systems.core import DoubleDatasetTrainingMethod
 
 # --- Add this block for reproducibility ---
 def set_global_seed(seed):
@@ -39,21 +61,6 @@ def set_global_seed(seed):
     if hasattr(torch, 'use_deterministic_algorithms'):
         torch.use_deterministic_algorithms(True)
 # --- End reproducibility block ---
-
-from utils.tensor_board_logger import TensorboardLogger
-from training_systems.training_methods import (
-    Adversarial,
-    KLCoCoOp,
-    BaseCoCoOp,
-    KLCoCoOpV2,
-)
-from training_systems.evaluation_methods import (
-    ZeroShotTestStep,
-    FineTunedTestStep,
-    EvalStep,
-)
-from utils.clustering import conditional_clustering, random_clustering, rotating_cluster_generator_shift
-from training_systems.core import DoubleDatasetTrainingMethod
 
 
 def checksum(model):

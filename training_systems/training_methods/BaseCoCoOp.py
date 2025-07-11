@@ -9,10 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from training_systems.core import TrainingMethod
-
-from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
-from utils.kl import get_kl_loss
+from utils import AverageMeter, ContiguousLabelDataset
 
 
 class BaseCoCoOp(TrainingMethod):

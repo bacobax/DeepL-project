@@ -8,8 +8,7 @@ from typing import Dict, Any, Callable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
+from utils import AverageMeter, ContiguousLabelDataset
 
 class DoubleDatasetTrainingMethod:
     """

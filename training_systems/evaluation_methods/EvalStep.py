@@ -6,8 +6,7 @@ import torch.nn.functional as F
 import torch
 
 from training_systems.core import EvaluationMethod
-from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
-from utils.metrics import AverageMeter
+from utils import ContiguousLabelDataset, CLASS_NAMES, AverageMeter
 
 
 class EvalStep(EvaluationMethod):
