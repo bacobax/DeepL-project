@@ -8,7 +8,7 @@ from typing import Dict, Any
 import torch
 from torch.utils.data import DataLoader
 
-from training_systems.training_methods.TrainingMethod import TrainingMethod
+from training_systems.core import TrainingMethod
 
 from utils.metrics import AverageMeter
 from utils.datasets import ContiguousLabelDataset
@@ -118,7 +118,7 @@ class BaseCoCoOp(TrainingMethod):
         """
         return debug_metrics
 
-    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> list[float]:
         """
         Extracts and returns the average loss and accuracy metrics after a training step.
 

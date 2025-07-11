@@ -2,14 +2,13 @@
 This module implements the Adversarial training method, which incorporates a gradient reversal layer
 and an adversarial MLP to encourage domain-invariant feature learning.
 """
-
 from typing import Dict, Any, List
 
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-from training_systems.training_methods.TrainingMethod import TrainingMethod
+from training_systems.core import TrainingMethod
 from utils.metrics import AverageMeter
 from utils.datasets import ContiguousLabelDataset
 from utils.datasets import CLASS_NAMES

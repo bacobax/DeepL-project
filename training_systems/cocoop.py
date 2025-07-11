@@ -5,10 +5,8 @@ Includes configuration, data loading, model preparation, and training logic for 
 
 import os
 import math
-from collections import Counter
 from copy import deepcopy
 from statistics import harmonic_mean
-
 import torch
 from easydict import EasyDict
 from tqdm import tqdm
@@ -16,16 +14,35 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 import clip
+import numpy as np
 import random
+import hashlib
+
 from model.cocoop.custom_clip import CustomCLIP
 from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
-import hashlib
+
+# --- Add this block for reproducibility ---
+def set_global_seed(seed):
+
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # For CUDA >= 10.2, for full determinism
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    # For PyTorch >= 1.8
+    if hasattr(torch, 'use_deterministic_algorithms'):
+        torch.use_deterministic_algorithms(True)
+# --- End reproducibility block ---
 
 from utils.tensor_board_logger import TensorboardLogger
 from training_systems.training_methods import (
     Adversarial,
-    KLAdversarial,
     KLCoCoOp,
     BaseCoCoOp,
     KLCoCoOpV2,
@@ -36,7 +53,7 @@ from training_systems.evaluation_methods import (
     EvalStep,
 )
 from utils.clustering import conditional_clustering, random_clustering, rotating_cluster_generator_shift
-from training_systems.training_methods.DoubleDatasetTrainingMethod import DoubleDatasetTrainingMethod
+from training_systems.core import DoubleDatasetTrainingMethod
 
 
 def checksum(model):
@@ -67,7 +84,7 @@ class CoCoOpSystem:
         *,
         test_batch_size=16,
         pseudo_base_ratio=0.7,
-        pseudo_split_seed=42,
+        seed=42,
         device="cuda",
         run_name="exp1",
         cnn_model="ViT-B/32",
@@ -97,6 +114,10 @@ class CoCoOpSystem:
             debug (bool): Enables logging of additional debug information.
             prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration dictionaries.
         """
+        # --- Set global seed for reproducibility ---
+        self.seed = seed if seed is not None else 42
+        set_global_seed(self.seed)
+        # --- End reproducibility ---
         assert prompt_learner_opt is not None, "prompt_learner_opt must be provided"
         assert kl_loss_opt is not None, "kl_loss_opt must be provided"
         assert adv_training_opt is not None, "adv_training_opt must be provided"
@@ -108,7 +129,7 @@ class CoCoOpSystem:
 
         # --- NEW: Pseudo-base/novel split param ---
         self.pseudo_base_ratio = pseudo_base_ratio
-        self.pseudo_split_seed = pseudo_split_seed
+        self.pseudo_split_seed = seed
 
         self.test_batch_size = test_batch_size
         self.device = device
@@ -171,7 +192,7 @@ class CoCoOpSystem:
                 "prompt_learner_warmup_epochs" : self.prompt_learner_warmup_epochs,
                 "double_datasets_kl": self.double_datasets_kl,
                 "pseudo_base_ratio": self.pseudo_base_ratio,
-                "pseudo_split_seed": self.pseudo_split_seed,
+                "pseudo_split_seed": self.seed,
             }
         )
 
@@ -196,10 +217,14 @@ class CoCoOpSystem:
 
         self.rotation_steps = int(len(self.base_classes)*(1-self.pseudo_base_ratio))
 
-        self.cluster_generator = rotating_cluster_generator_shift(self.base_classes, self.pseudo_base_ratio, steps=self.rotation_steps)
+        self.cluster_generator = rotating_cluster_generator_shift(
+            self.base_classes, 
+            self.pseudo_base_ratio, 
+            steps=self.rotation_steps, 
+            seed=self.seed
+        )
+        
         _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
-     
-
 
         self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
         self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
@@ -258,11 +283,11 @@ class CoCoOpSystem:
 
         clustering_type = clustering_opt["clustering_type"]
 
-        if clustering_type == "random":
+        if clustering_type == "random": 
             # Use random clustering
             self.cls_cluster_dict, _ = random_clustering(
                 n_cluster=clustering_opt["n_clusters"],
-                seed=clustering_opt["seed"],
+                seed=self.seed,
                 distribution="uniform",
             )
         elif clustering_type == "semantic": 
@@ -652,7 +677,7 @@ class CoCoOpSystem:
 
         metrics_base = self.eval_method.evaluate(
             dataset=self.val_pseudo_base,
-            new_classnames=self.pseudo_base_classes,
+            classnames=self.pseudo_base_classes,
             desc_add=" - Pseudo Base",
         )
         base_val_loss = metrics_base["loss"]
@@ -661,7 +686,7 @@ class CoCoOpSystem:
         metrics_novel = self.eval_method.evaluate(
 
             dataset=self.val_pseudo_novel,
-            new_classnames=self.pseudo_novel_classes,
+            classnames=self.pseudo_novel_classes,
             desc_add=" - Pseudo Novel",
         )
 
@@ -731,20 +756,22 @@ class CoCoOpSystem:
             base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
                 dataset=self.test_base,
                 desc_add=" - Base Zero Shot",
+                classnames=self.base_classes,
             )
             novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
                 dataset=self.test_novel,
                 desc_add=" - Novel Zero Shot",
+                classnames=self.novel_classes
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
-                new_classnames=self.base_classes,
+                classnames=self.base_classes,
                 desc_add=" - Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
-                new_classnames=self.novel_classes,
+                classnames=self.novel_classes,
                 desc_add=" - Novel Fine Tuned",
             )
 
