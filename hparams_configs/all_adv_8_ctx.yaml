@@ -17,7 +17,7 @@ cocoop:
       weight_decay: 0.0001
       momentum: 0.9
     - prompt_lr: 0.002
-      mlp_lr: 0.002
+      mlp_lr: 0.005
       weight_decay: 0.0005
       momentum: 0.8
   skip_tests: [true, true, false]
@@ -31,14 +31,14 @@ cocoop:
     lambda_kl: [0.1, 0.1]
     using_kl: [true, false]
   adv_training_opt:
-    adv_training_epochs: 20
+    adv_training_epochs: 200
     batch_size: 10
-    warmup_lambda_adv: 6
+    warmup_lambda_adv: 20
     lambda_adv: 1
     grl_lambda: 1
     mlp_opt:
       hidden_structure: [563, 256, 128]
-    prompt_learner_warmup_epochs: 4
+    prompt_learner_warmup_epochs: 10
   base_training_opt:
     epochs: 0
     batch_size: 10
