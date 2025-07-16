@@ -167,13 +167,14 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
-
         print(
             "BATCH SIZES: ",
             self.test_batch_size,
             self.base_batch_size,
             self.adv_batch_size,
         )
+
+        self.ignore_no_improvement = adv_training_opt.get("ignore_no_improvement", False)
 
         self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
         self.writer.add_text("Hparams yaml file", hparams_file)
@@ -655,7 +656,7 @@ class CoCoOpSystem:
                 )
             pbar.update(1)
 
-        if at_least_one_improving and self.epochs != 0:
+        if (at_least_one_improving and self.epochs != 0) or self.ignore_no_improvement:
             print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
             self.model.load_state_dict(torch.load(best_model_path))
             print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")

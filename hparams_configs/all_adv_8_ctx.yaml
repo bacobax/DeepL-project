@@ -39,6 +39,7 @@ cocoop:
     mlp_opt:
       hidden_structure: [563, 256, 128]
     prompt_learner_warmup_epochs: 10
+    ignore_no_improvement: true
   base_training_opt:
     epochs: 0
     batch_size: 10
