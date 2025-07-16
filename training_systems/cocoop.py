@@ -683,23 +683,42 @@ class CoCoOpSystem:
             Tuple[float, float]: Accuracy for base and novel classes.
         """
 
-        metrics_base = self.eval_method.evaluate(
-            dataset=self.val_pseudo_base,
-            classnames=self.pseudo_base_classes,
-            desc_add=" - Pseudo Base",
-        )
-        base_val_loss = metrics_base["loss"]
-        base_val_acc = metrics_base["accuracy"]
+        if is_adv:
+            metrics_base = self.eval_method.evaluate(
+                dataset=self.val_base,
+                classnames=self.base_classes,
+                desc_add=" - Base",
+            )
+            base_val_loss = metrics_base["loss"]
+            base_val_acc = metrics_base["accuracy"]
 
-        metrics_novel = self.eval_method.evaluate(
+            metrics_novel = self.eval_method.evaluate(
+                dataset=self.val_novel,
+                classnames=self.novel_classes,
+                desc_add=" - Novel",
+            )
+            novel_val_loss = metrics_novel["loss"]
+            novel_val_acc = metrics_novel["accuracy"]   
+            
+        else:
 
-            dataset=self.val_pseudo_novel,
-            classnames=self.pseudo_novel_classes,
-            desc_add=" - Pseudo Novel",
-        )
+            metrics_base = self.eval_method.evaluate(
+                dataset=self.val_pseudo_base,
+                classnames=self.pseudo_base_classes,
+                desc_add=" - Pseudo Base",
+            )
+            base_val_loss = metrics_base["loss"]
+            base_val_acc = metrics_base["accuracy"]
 
-        novel_val_loss = metrics_novel["loss"]
-        novel_val_acc = metrics_novel["accuracy"]
+            metrics_novel = self.eval_method.evaluate(
+
+                dataset=self.val_pseudo_novel,
+                classnames=self.pseudo_novel_classes,
+                desc_add=" - Pseudo Novel",
+            )
+
+            novel_val_loss = metrics_novel["loss"]
+            novel_val_acc = metrics_novel["accuracy"]
 
         self.logger.log_validation(
             epoch,
