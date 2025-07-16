@@ -117,17 +117,22 @@ class Adversarial(TrainingMethod):
             logits, ce_loss, img_features, ctx, bias, avg_txt_features = self.model(inputs, targets, get_image_features=True)
             concat = torch.cat([avg_txt_features, logits], dim=1).to(dtype=torch.float32)
             reversed_logits = self.grl(concat)
-            cluster_logits = self.mlp_adversary(reversed_logits).squeeze()
-            loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
+            cluster_logits = self.mlp_adversary(reversed_logits)
+
+            if cluster_logits.shape[1] == 1:
+                # Binary classification
+                cluster_logits = cluster_logits.squeeze(-1)
+                loss_adv = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target.float())
+            else:
+                # Multi-class classification
+                loss_adv = F.cross_entropy(cluster_logits, cluster_target.long())
+
             # Skip adversarial update if prompt learner is frozen
             if any(p.requires_grad for p in self.model.prompt_learner.parameters()):
                 ce_grads = self.get_grads(ce_loss)
             else:
                 ce_grads = None  # Or torch.zeros_like(...), depending on downstream use
-            """if batch_idx < 3 and self.debug:
-                bce_grads = self.get_grads(loss_bce)
-                self.print_grads_norms(bce_grads, ce_grads)"""
-            total_loss = ce_loss + self.lambda_adv * loss_bce
+            total_loss = ce_loss + self.lambda_adv * loss_adv
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(
                 list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
@@ -138,20 +143,20 @@ class Adversarial(TrainingMethod):
             self.optimizer_step()
             if batch_idx < 3 and self.debug:  # Log only a few batches for performance
                 print(f"[Batch {batch_idx}] CE Loss: {ce_loss.item():.4f} | "
-                      f"Adv Loss: {loss_bce.item():.4f} | "
+                      f"Adv Loss: {loss_adv.item():.4f} | "
                       f"Total Loss: {total_loss.item():.4f} | "
                       f"lambda_adv: {self.lambda_adv:.4f}")
             batch_size = inputs.shape[0]
             metrics["total_loss_metric"].update(total_loss.item(), n=batch_size)
             metrics["ce_loss_metric"].update(ce_loss.item(), n=batch_size)
-            metrics["adv_loss_metric"].update(loss_bce.item(), n=batch_size)
+            metrics["adv_loss_metric"].update(loss_adv.item(), n=batch_size)
             _, predicted = logits.max(dim=1)
             correct = predicted.eq(targets).sum().item()
             metrics["accuracy_metric"].update(correct, n=batch_size, raw=True)
             return {
                 "total_loss": total_loss.item(),
                 "ce_loss": ce_loss.item(),
-                "adv_loss": loss_bce.item(),
+                "adv_loss": loss_adv.item(),
                 "accuracy": correct / batch_size,
             }
 

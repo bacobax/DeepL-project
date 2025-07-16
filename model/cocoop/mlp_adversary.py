@@ -43,7 +43,7 @@ class GradientReversalLayer(nn.Module):
 
 
 class AdversarialMLP(nn.Module):
-    def __init__(self, input_dim, opt):
+    def __init__(self, input_dim, opt, output_dim=1):
         super().__init__()
         hidden_dims = opt.hidden_structure
 
@@ -51,7 +51,9 @@ class AdversarialMLP(nn.Module):
 
         for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
             layers.append(ResidualBlock(in_dim, out_dim))
-        layers.append(nn.Linear(hidden_dims[-1], 1))  # final output
+
+        # Final output layer with configurable output_dim
+        layers.append(nn.Linear(hidden_dims[-1], output_dim))
         self.model = nn.Sequential(*layers)
 
         self.model.apply(self.init_weights.__get__(self, AdversarialMLP))
@@ -60,7 +62,8 @@ class AdversarialMLP(nn.Module):
         return self.model(x)
 
     def predict(self, x):
-        return nn.functional.sigmoid(self.forward(x)).squeeze(-1)
+        out = self.forward(x)
+        return torch.sigmoid(out).squeeze(-1) if out.shape[-1] == 1 else torch.sigmoid(out)
 
     def init_weights(self, m):
         if isinstance(m, nn.Linear):
