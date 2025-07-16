@@ -629,7 +629,7 @@ class CoCoOpSystem:
                     e,
                     is_adv=True,
                 )
-                if novel_val_acc > best_novel_accuracy:
+                if novel_val_acc > best_novel_accuracy or self.ignore_no_improvement:
                     best_novel_accuracy = novel_val_acc
                     print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
                     torch.save(self.model.state_dict(), best_model_path)
