@@ -5,9 +5,8 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch
 
-from training_systems.evaluation_methods.EvaluationMethod import EvaluationMethod
-from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
-from utils.metrics import AverageMeter
+from training_systems.core import EvaluationMethod
+from utils import ContiguousLabelDataset, CLASS_NAMES, AverageMeter
 
 
 class EvalStep(EvaluationMethod):
@@ -15,7 +14,7 @@ class EvalStep(EvaluationMethod):
     Generic evaluation step for models that support temporary class name modification.
     """
     @torch.no_grad()
-    def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, classnames, desc_add="") -> Dict[str, float]:
         """
         Evaluate model performance on the provided dataset.
 
@@ -30,14 +29,11 @@ class EvalStep(EvaluationMethod):
         self.model.eval()
         loss_meter = AverageMeter()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset)
+        tmp_dataset = ContiguousLabelDataset(dataset, classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
 
-        if new_classnames is not None:
-            new_classnames = [CLASS_NAMES[c] for c in new_classnames]
-            with self.model.temporary_classnames(new_classnames):
-                self.walk(loss_meter, accuracy_meter, dataloader, desc_add)
-        else:
+        remapped_classnames = [ CLASS_NAMES[ tmp_dataset.idx2cat[i] ] for i in range(len(tmp_dataset.idx2cat)) ]
+        with self.model.temporary_classnames(remapped_classnames):
             self.walk(loss_meter, accuracy_meter, dataloader, desc_add)
 
         return {"loss": loss_meter.avg, "accuracy": accuracy_meter.avg}

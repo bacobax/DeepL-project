@@ -8,11 +8,9 @@ from typing import Dict, Any
 import torch
 from torch.utils.data import DataLoader
 
-from training_systems.training_methods.TrainingMethod import TrainingMethod
+from training_systems.core.TrainingMethod import TrainingMethod
 
-from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
-from utils.kl import get_kl_loss
+from utils import AverageMeter,ContiguousLabelDataset, get_kl_loss
 
 
 class KLCoCoOp(TrainingMethod):
@@ -107,7 +105,7 @@ class KLCoCoOp(TrainingMethod):
 
         if not base_batch or not novel_batch:
             return {
-                metric: val
+                metric: val.avg
                 for metric, val in metrics.items()
             }
 
@@ -161,7 +159,7 @@ class KLCoCoOp(TrainingMethod):
         """
         return debug_metrics
 
-    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> list[float]:
         """
         Returns the average values of tracked metrics after a training step.
 

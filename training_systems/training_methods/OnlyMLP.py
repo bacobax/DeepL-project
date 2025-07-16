@@ -9,9 +9,8 @@ import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-from training_systems.training_methods.TrainingMethod import TrainingMethod
-from utils.metrics import AverageMeter
-from utils.datasets import ContiguousLabelDataset
+from training_systems.core import TrainingMethod
+from utils import AverageMeter, ContiguousLabelDataset
 from model.cocoop.mlp_adversary import AdversarialMLP, GradientReversalLayer
 
 
@@ -154,7 +153,7 @@ class OnlyMLP(TrainingMethod):
         """
         return debug_metrics
 
-    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> [float]:
+    def training_step_return(self, metrics: Dict[str, AverageMeter]) -> list[float]:
         """
         Args:
             metrics (Dict[str, AverageMeter]): Collected training metrics.

@@ -19,14 +19,14 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     Returns:
         Tensor: A scalar tensor representing the KL divergence loss.
     """
-    targets_novel_tensor = torch.tensor(targets_novel).to(device)
-    categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
+    targets_novel_tensor = torch.tensor(targets_novel).to(device) if isinstance(targets_novel, list) else targets_novel
+    categories_novel_tensor = [tmp_dataset.idx2cat[c.item()] for c in list(set(targets_novel_tensor))]
     # print(f"input novel shape: {inputs_novel.shape} novel base: {targets_novel_tensor.shape}")
     with torch.no_grad():
         image_features_clip = model.clip_model.encode_image(inputs_novel)
         image_features_clip = image_features_clip / image_features_clip.norm(dim=-1, keepdim=True)
 
-        category_idxs = [tmp_dataset.idx2cat[c] for c in list(set(targets_novel))]
+        category_idxs = [tmp_dataset.idx2cat[c.item()] for c in list(set(targets_novel_tensor))]
 
         text_inputs = clip.tokenize(
             [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in category_idxs]

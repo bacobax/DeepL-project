@@ -5,9 +5,8 @@ Includes configuration, data loading, model preparation, and training logic for 
 
 import os
 import math
-from collections import Counter
 from copy import deepcopy
-
+from statistics import harmonic_mean
 import torch
 from easydict import EasyDict
 from tqdm import tqdm
@@ -15,25 +14,53 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 import clip
+import numpy as np
 import random
-from model.cocoop.custom_clip import CustomCLIP
-from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
-from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 import hashlib
 
-from utils.tensor_board_logger import TensorboardLogger
+from model.cocoop.custom_clip import CustomCLIP
+from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
+from utils import (
+    conditional_clustering,
+    random_clustering,
+    rotating_cluster_generator_shift,
+    get_data,
+    base_novel_categories,
+    split_data,
+    TensorboardLogger,
+    CLASS_NAMES
+)
+
 from training_systems.training_methods import (
     Adversarial,
-    KLAdversarial,
     KLCoCoOp,
     BaseCoCoOp,
+    KLCoCoOpV2,
 )
 from training_systems.evaluation_methods import (
     ZeroShotTestStep,
     FineTunedTestStep,
     EvalStep,
 )
-from utils.clustering import conditional_clustering, random_clustering
+from training_systems.core import DoubleDatasetTrainingMethod
+
+# --- Add this block for reproducibility ---
+def set_global_seed(seed):
+
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # For CUDA >= 10.2, for full determinism
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    # For PyTorch >= 1.8
+    if hasattr(torch, 'use_deterministic_algorithms'):
+        torch.use_deterministic_algorithms(True)
+# --- End reproducibility block ---
 
 
 def checksum(model):
@@ -63,6 +90,8 @@ class CoCoOpSystem:
         self,
         *,
         test_batch_size=16,
+        pseudo_base_ratio=0.7,
+        seed=42,
         device="cuda",
         run_name="exp1",
         cnn_model="ViT-B/32",
@@ -76,6 +105,7 @@ class CoCoOpSystem:
         adv_training_opt=None,
         base_training_opt=None,
         clustering_opt=None,
+
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -91,6 +121,10 @@ class CoCoOpSystem:
             debug (bool): Enables logging of additional debug information.
             prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration dictionaries.
         """
+        # --- Set global seed for reproducibility ---
+        self.seed = seed if seed is not None else 42
+        set_global_seed(self.seed)
+        # --- End reproducibility ---
         assert prompt_learner_opt is not None, "prompt_learner_opt must be provided"
         assert kl_loss_opt is not None, "kl_loss_opt must be provided"
         assert adv_training_opt is not None, "adv_training_opt must be provided"
@@ -101,8 +135,8 @@ class CoCoOpSystem:
         ), "Two optimizer configs must be provided"
 
         # --- NEW: Pseudo-base/novel split param ---
-        self.pseudo_base_ratio = base_training_opt.get("pseudo_base_ratio", 0.7)
-        self.pseudo_split_seed = base_training_opt.get("pseudo_split_seed", 42)
+        self.pseudo_base_ratio = pseudo_base_ratio
+        self.pseudo_split_seed = seed
 
         self.test_batch_size = test_batch_size
         self.device = device
@@ -113,6 +147,7 @@ class CoCoOpSystem:
         self.class_token_position = prompt_learner_opt["class_token_position"]
         self.csc = prompt_learner_opt["csc"]
         self.lambda_kl = kl_loss_opt["lambda_kl"]
+        self.double_datasets_kl = kl_loss_opt.get("double_datasets_kl", False)
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
@@ -162,6 +197,9 @@ class CoCoOpSystem:
                 "cnn_model": self.cnn_model,
                 "grl_lambda": self.grl_lambda,
                 "prompt_learner_warmup_epochs" : self.prompt_learner_warmup_epochs,
+                "double_datasets_kl": self.double_datasets_kl,
+                "pseudo_base_ratio": self.pseudo_base_ratio,
+                "pseudo_split_seed": self.seed,
             }
         )
 
@@ -175,12 +213,6 @@ class CoCoOpSystem:
         self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         # --- NEW: Pseudo-base/novel split ---
-   
-        base_classes_shuffled = self.base_classes.copy()
-        random.Random(self.pseudo_split_seed).shuffle(base_classes_shuffled)
-        n_pseudo_base = int(len(base_classes_shuffled) * self.pseudo_base_ratio)
-        self.pseudo_base_classes = sorted(base_classes_shuffled[:n_pseudo_base])
-        self.pseudo_novel_classes = sorted(base_classes_shuffled[n_pseudo_base:])
 
         # Helper to split a dataset by class list
         # (moved to method below)
@@ -189,6 +221,17 @@ class CoCoOpSystem:
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
+
+        self.rotation_steps = int(len(self.base_classes)*(1-self.pseudo_base_ratio))
+
+        self.cluster_generator = rotating_cluster_generator_shift(
+            self.base_classes, 
+            self.pseudo_base_ratio, 
+            steps=self.rotation_steps, 
+            seed=self.seed
+        )
+        
+        _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
 
         self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
         self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
@@ -247,11 +290,11 @@ class CoCoOpSystem:
 
         clustering_type = clustering_opt["clustering_type"]
 
-        if clustering_type == "random":
+        if clustering_type == "random": 
             # Use random clustering
             self.cls_cluster_dict, _ = random_clustering(
                 n_cluster=clustering_opt["n_clusters"],
-                seed=clustering_opt["seed"],
+                seed=self.seed,
                 distribution="uniform",
             )
         elif clustering_type == "semantic": 
@@ -322,24 +365,32 @@ class CoCoOpSystem:
                 grl=self.grl,
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
-                tmp_classes=self.base_classes,
+                tmp_classes=self.base_classes, 
             )
             
+        if self.using_kl[0]:
+            if self.double_datasets_kl:
+                self.basic_train_method = KLCoCoOpV2(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    debug=self.debug,
+                    lambda_kl=self.lambda_kl[0],
+                )
+            else:
+                self.basic_train_method = KLCoCoOp(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    debug=self.debug,
+                    lambda_kl=self.lambda_kl[0],
+                )
+        else:
+            self.basic_train_method = BaseCoCoOp(
+                model=self.model,
+                optimizer=self.optimizer,
+                debug=self.debug,
+            )
+
         
-        self.basic_train_method = (
-            BaseCoCoOp(
-                model=self.model,
-                optimizer=self.optimizer,
-                debug=self.debug,
-            )
-            if not self.using_kl[0]
-            else KLCoCoOp(
-                model=self.model,
-                optimizer=self.optimizer,
-                debug=self.debug,
-                lambda_kl=self.lambda_kl[0],
-            )
-        )
 
     def train(self):
         """
@@ -423,9 +474,9 @@ class CoCoOpSystem:
             best_model_path (str): Path to store the best base model.
 
         Returns:
-            Tuple[int, float]: Final epoch index and best validation accuracy on novel classes.
+            Tuple[int, float]: Final epoch index and best validation score.
         """
-        best_novel_accuracy = 0.0
+        best_score = 0.0
         patience = 4
         patience_counter = 0
         c = 0
@@ -436,14 +487,33 @@ class CoCoOpSystem:
         for e in range(self.max_epoch):
 
             if self.using_kl[0]:
-                total_loss, acc, ce_loss, kl_loss = method.train_step(
-                    self.train_pseudo_base,
-                    self.base_batch_size,
-                )
-            else:
+                if isinstance(method, DoubleDatasetTrainingMethod):
+                    _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
+                    self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
+                    self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
+                    self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
+                    self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
+
+                    kl_loss, ce_loss, acc = method.double_datasets_train_step(
+                        self.train_pseudo_base,
+                        self.train_pseudo_novel,
+                        self.base_batch_size,
+                        ["pseudo_base", "pseudo_novel KL"],
+                        self.pseudo_base_classes,
+                        self.pseudo_novel_classes,
+                    )
+                    total_loss = ce_loss + kl_loss
+                else:
+                    total_loss, acc, ce_loss, kl_loss = method.train_step(
+                        self.train_pseudo_base,
+                        self.base_batch_size,
+                        classnames=self.pseudo_base_classes
+                    )
+            elif isinstance(method, BaseCoCoOp):
                 total_loss, acc = method.train_step(
                     self.train_pseudo_base,
                     self.base_batch_size,
+                    classnames=self.pseudo_base_classes
                 )
                 kl_loss = None
                 ce_loss = total_loss
@@ -458,8 +528,11 @@ class CoCoOpSystem:
             )
 
             base_val_acc, novel_val_acc = self._evaluate_and_log(e)
-            if novel_val_acc > best_novel_accuracy:
-                best_novel_accuracy = novel_val_acc
+
+            score = harmonic_mean([base_val_acc, novel_val_acc])
+
+            if score > best_score:
+                best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
             else:
@@ -467,19 +540,21 @@ class CoCoOpSystem:
                 if patience_counter >= patience:
                     print(f"Early stopping at epoch {e}")
                     break
+
             self.lr_scheduler.step()
             pbar.set_postfix(
-                base_val_acc=base_val_acc,
-                pseudo_novel_acc=novel_val_acc,
+                PB_val_acc=base_val_acc,
+                PN_val_acc=novel_val_acc,
+                score=score,
                 lr=self.optimizer.param_groups[0]["lr"],
-                ce_loss=ce_loss,
-                kl_loss=kl_loss,
+                ce_L=ce_loss,
+                kl_L=kl_loss,
                 pat_c=patience_counter,
             )
             pbar.update(1)
             c += 1
 
-        return c, best_novel_accuracy
+        return c, best_score
 
     def _train_adversarial_phase(self, start_epoch, best_model_path):
         """
@@ -526,11 +601,13 @@ class CoCoOpSystem:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.base_batch_size,
+                    classnames=self.base_classes
                 )
             else:
                 total_loss, acc, ce_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.adv_batch_size,
+                    classnames=self.base_classes
                 )
                 kl_loss = None
 
@@ -563,11 +640,11 @@ class CoCoOpSystem:
                         print(f"Early stopping adversarial at epoch {e}")
                         break
                 pbar.set_postfix(
-                    base_val_acc=base_val_acc,
-                    pseudo_novel_acc=novel_val_acc,
-                    ce_loss=ce_loss,
-                    kl_loss=kl_loss,
-                    adv_loss=adv_loss,
+                    PB_val_acc=base_val_acc,
+                    PN_val_acc=novel_val_acc,
+                    ce_L=ce_loss,
+                    kl_L=kl_loss,
+                    adv_L=adv_loss,
                     lr=self.optimizer.param_groups[0]["lr"],
                     pat_c=patience_counter,
                 )
@@ -607,6 +684,7 @@ class CoCoOpSystem:
 
         metrics_base = self.eval_method.evaluate(
             dataset=self.val_pseudo_base,
+            classnames=self.pseudo_base_classes,
             desc_add=" - Pseudo Base",
         )
         base_val_loss = metrics_base["loss"]
@@ -615,7 +693,7 @@ class CoCoOpSystem:
         metrics_novel = self.eval_method.evaluate(
 
             dataset=self.val_pseudo_novel,
-            new_classnames=self.pseudo_novel_classes,
+            classnames=self.pseudo_novel_classes,
             desc_add=" - Pseudo Novel",
         )
 
@@ -684,28 +762,30 @@ class CoCoOpSystem:
         if base:
             base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
                 dataset=self.test_base,
-                desc_add=" - Pseudo Base Zero Shot",
+                desc_add=" - Base Zero Shot",
+                classnames=self.base_classes,
             )
             novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
                 dataset=self.test_novel,
-                desc_add=" - Pseudo Novel Zero Shot",
+                desc_add=" - Novel Zero Shot",
+                classnames=self.novel_classes
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_base,
-                new_classnames=self.base_classes,
-                desc_add=" - Pseudo Base Fine Tuned",
+                classnames=self.base_classes,
+                desc_add=" - Base Fine Tuned",
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
-                new_classnames=self.novel_classes,
-                desc_add=" - Pseudo Novel Fine Tuned",
+                classnames=self.novel_classes,
+                desc_add=" - Novel Fine Tuned",
             )
 
         base_accuracy = base_metrics["accuracy"]
         novel_accuracy = novel_metrics["accuracy"]
-        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "pseudo_base_classes")
-        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "pseudo_novel_classes")
+        self.logger.log_test_accuracy(epoch_idx, base_accuracy, "base_classes")
+        self.logger.log_test_accuracy(epoch_idx, novel_accuracy, "novel_classes")
         return base_accuracy, novel_accuracy
 
     def save_model(self, path="./bin/cocoop", prefix=""):
