@@ -12,7 +12,7 @@ coop:
 cocoop:
   cnn_model: "ViT-B/32"
   test_batch_size: 10
-  pseudo_base_ratio: 0.9
+  pseudo_base_ratio: 0.8
   pseudo_split_seed: 42
   optimizer_configs:
     - prompt_lr: 0.002
@@ -30,9 +30,10 @@ cocoop:
     class_token_position: "end"
     csc: false
   kl_loss_opt:
-    lambda_kl: [0.2, 0.1]
+    lambda_kl: [0.05, 0.1]
     using_kl: [true, false]
     double_datasets_kl: true
+    rotation_period: 1
   adv_training_opt:
     batch_size: 10
     warmup_lambda_adv: 2
@@ -44,7 +45,7 @@ cocoop:
     prompt_learner_warmup_epochs: 0
   base_training_opt:
     batch_size: 16
-    warmup_epoch: 3
+    warmup_epoch: 2
     warmup_cons_lr: 0.00001
     epochs: 15
   clustering_opt:

@@ -148,6 +148,7 @@ class CoCoOpSystem:
         self.csc = prompt_learner_opt["csc"]
         self.lambda_kl = kl_loss_opt["lambda_kl"]
         self.double_datasets_kl = kl_loss_opt.get("double_datasets_kl", False)
+        self.rotation_period = kl_loss_opt.get("rotation_period", "relative")
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
@@ -467,6 +468,17 @@ class CoCoOpSystem:
             self.save_model(path="./bin/cocoop", prefix="after_adv_train_")
             self.save_mlp_adversary()
 
+    def get_next_rotation(self):
+        """
+        Get the next rotation of the pseudo base and pseudo novel classes.
+        """
+        _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
+        self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
+        self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
+        self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
+        self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
+        return self.pseudo_base_classes, self.pseudo_novel_classes, self.train_pseudo_base, self.train_pseudo_novel, self.val_pseudo_base, self.val_pseudo_novel
+
     def _train_base_phase(self, best_model_path):
         """
         Train the model using KL regularization only (no adversarial objective).
@@ -482,19 +494,15 @@ class CoCoOpSystem:
         patience_counter = 0
         c = 0
         method = self.basic_train_method
-
+        rotation_epochs = patience - 2 if self.rotation_period == "relative" else self.rotation_period
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
 
         for e in range(self.max_epoch):
 
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
-                    _, self.pseudo_base_classes, self.pseudo_novel_classes = next(self.cluster_generator)
-                    self.train_pseudo_base = self.split_by_classes(self.train_base, self.pseudo_base_classes)
-                    self.train_pseudo_novel = self.split_by_classes(self.train_base, self.pseudo_novel_classes)
-                    self.val_pseudo_base = self.split_by_classes(self.val_base, self.pseudo_base_classes)
-                    self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
-
+                    if e % rotation_epochs == 0:
+                        self.pseudo_base_classes, self.pseudo_novel_classes, self.train_pseudo_base, self.train_pseudo_novel, self.val_pseudo_base, self.val_pseudo_novel = self.get_next_rotation()
                     kl_loss, ce_loss, acc = method.double_datasets_train_step(
                         self.train_pseudo_base,
                         self.train_pseudo_novel,
