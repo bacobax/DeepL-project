@@ -202,6 +202,7 @@ class CoCoOpSystem:
                 "double_datasets_kl": self.double_datasets_kl,
                 "pseudo_base_ratio": self.pseudo_base_ratio,
                 "pseudo_split_seed": self.seed,
+                "rotation_period": self.rotation_period,
             }
         )
 
