@@ -29,7 +29,7 @@ cocoop:
     class_token_position: "end"
     csc: false
   kl_loss_opt:
-    lambda_kl: [0.05, 0.1]
+    lambda_kl: [0.1, 0.1]
     using_kl: [true, false]
     double_datasets_kl: true
     rotation_period: 4
@@ -46,7 +46,7 @@ cocoop:
     batch_size: 16
     warmup_epoch: 2
     warmup_cons_lr: 0.00001
-    epochs: 15
+    epochs: 25
   clustering_opt:
     n_clusters: 2
     variance: 0.95

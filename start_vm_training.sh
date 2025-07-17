@@ -13,8 +13,10 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-  "base_kl_v2_80_20_kl_01_rot_period_rel"
+  "base_kl_v2_80_20_kl_01_rot_period_1"
   "base_kl_v2_80_20_kl_01_rot_period_3"
+  "base_kl_v2_80_20_kl_01_rot_period_4"
+  "base_kl_v2_80_20_kl_01_rot_period_rel"
 )
 DEBUG="false"
 

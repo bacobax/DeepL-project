@@ -491,11 +491,11 @@ class CoCoOpSystem:
             Tuple[int, float]: Final epoch index and best validation score.
         """
         best_score = 0.0
-        patience = 4
+        patience = 8
         patience_counter = 0
         c = 0
         method = self.basic_train_method
-        rotation_epochs = patience - 2 if self.rotation_period == "relative" else self.rotation_period
+        rotation_epochs = int(patience * (3/4)) if self.rotation_period == "relative" else self.rotation_period
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
 
         for e in range(self.max_epoch):

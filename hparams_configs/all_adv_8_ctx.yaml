@@ -44,7 +44,7 @@ cocoop:
     epochs: 0
     batch_size: 10
     warmup_epoch: 0
-    warmup_cons_lr: 0.00001
+    warmup_cons_lr: 0.00001 
   clustering_opt:
     n_clusters: 4
     variance: 0.95
