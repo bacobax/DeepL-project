@@ -22,7 +22,7 @@ class EvaluationMethod(ABC):
         self.batch_size = batch_size
 
     @abstractmethod
-    def evaluate(self, dataset, **kwargs) -> Dict[str, float]:
+    def evaluate(self, dataset, classnames, desc_add="") -> Dict[str, float]:
         """
         Perform the evaluation.
 

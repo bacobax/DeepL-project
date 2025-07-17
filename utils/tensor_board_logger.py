@@ -1,6 +1,6 @@
 import os
 
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 
 
 def harmonic_mean(a, b):

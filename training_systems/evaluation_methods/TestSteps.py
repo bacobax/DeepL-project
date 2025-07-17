@@ -6,9 +6,8 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import torch
 
-from training_systems.evaluation_methods.EvaluationMethod import EvaluationMethod
-from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
-from utils.metrics import AverageMeter
+from training_systems.core import EvaluationMethod
+from utils import ContiguousLabelDataset, CLASS_NAMES, AverageMeter
 
 
 class ZeroShotTestStep(EvaluationMethod):
@@ -32,10 +31,10 @@ class ZeroShotTestStep(EvaluationMethod):
             self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
     @torch.no_grad()
-    def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, classnames, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
+        tmp_dataset = ContiguousLabelDataset(dataset, classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         # Remap labels into a contiguous set starting from zero
         self.walk(dataloader, accuracy_meter, desc_add)
@@ -73,10 +72,10 @@ class FineTunedTestStep(EvaluationMethod):
     """
 
     @torch.no_grad()
-    def evaluate(self, dataset, new_classnames=None, desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, classnames: list[int], desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset, new_classnames)
+        tmp_dataset = ContiguousLabelDataset(dataset, classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         remapped_class_names = [ CLASS_NAMES[ tmp_dataset.idx2cat[i] ] for i in range(len(tmp_dataset.idx2cat)) ]
         with self.model.temporary_classnames(remapped_class_names):
