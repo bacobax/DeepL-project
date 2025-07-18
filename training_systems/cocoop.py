@@ -810,12 +810,10 @@ class CoCoOpSystem:
             base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
                 dataset=self.test_base,
                 desc_add=" - Base Zero Shot",
-                classnames=self.base_classes,
             )
             novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
                 dataset=self.test_novel,
                 desc_add=" - Novel Zero Shot",
-                classnames=self.novel_classes
             )
         else:
             base_metrics = self.finetuned_test_method.evaluate(

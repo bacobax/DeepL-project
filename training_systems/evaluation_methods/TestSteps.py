@@ -18,7 +18,6 @@ class ZeroShotTestStep(EvaluationMethod):
     def __init__(self, model, batch_size, categories):
         super().__init__(model, batch_size)
         self.categories = categories
-        self.contig_cat2idx = {cat: idx for idx, cat in enumerate(self.categories)}
         # here we apply the standard CLIP template used for oxford flowers to all categories
         text_inputs = clip.tokenize(
             [f"a photo of a {CLASS_NAMES[c]}, a type of flower." for c in self.categories]
@@ -31,10 +30,10 @@ class ZeroShotTestStep(EvaluationMethod):
             self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
     @torch.no_grad()
-    def evaluate(self, dataset, classnames, desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, desc_add="") -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
-        tmp_dataset = ContiguousLabelDataset(dataset, classnames)
+        tmp_dataset = ContiguousLabelDataset(dataset, self.categories)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         # Remap labels into a contiguous set starting from zero
         self.walk(dataloader, accuracy_meter, desc_add)
@@ -48,8 +47,7 @@ class ZeroShotTestStep(EvaluationMethod):
             # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
             # Map targets in contiguous set starting from zero
             # Labels needs to be .long() in pytorch
-            target = torch.Tensor([self.contig_cat2idx[t.item()] for t in target]).long()
-
+            
             image = image.to(self.device)
             target = target.to(self.device)
 
