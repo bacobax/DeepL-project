@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from training_systems.core.TrainingMethod import TrainingMethod
 
 from utils import AverageMeter,ContiguousLabelDataset, get_kl_loss
+from utils.datasets import CLASS_NAMES
 
 
 class KLCoCoOp(TrainingMethod):
@@ -113,7 +114,17 @@ class KLCoCoOp(TrainingMethod):
         inputs_base = torch.stack([img for img, _ in base_batch]).to(self.device)
         targets_base = torch.tensor([lbl for _, lbl in base_batch]).to(self.device)
 
-        logits_base, loss_ce = self.model(inputs_base, targets_base)
+
+        categories_base_tensor = [dataset.idx2cat[int(c.item())] for c in list(set(targets_base))]
+        remapped_class_names = [ CLASS_NAMES[ c ] for c in categories_base_tensor ]
+
+        target_remapping = {cat:idx for idx, cat in enumerate(categories_base_tensor)}
+        target_original = [dataset.idx2cat[int(c.item())] for c in targets_base]
+        target_remapped = torch.tensor([target_remapping[c] for c in target_original]).to(self.device)
+
+        with self.model.temporary_classnames(remapped_class_names):
+            self.model.train()
+            logits_base, loss_ce = self.model(inputs_base, target_remapped)
 
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         self.model.eval()  # needed to disable dropout etc.
