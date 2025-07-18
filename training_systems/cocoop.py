@@ -807,9 +807,10 @@ class CoCoOpSystem:
         novel_accuracy = test_step(model, self.test_novel, self.novel_classes, self.batch_size, self.device, label="test", base=base)
         """
         if base:
-            base_metrics = self.zero_shot_pseudo_base_test_method.evaluate(
+            base_metrics = self.zero_shot_base_classes_test_method.evaluate(
                 dataset=self.test_base,
                 desc_add=" - Base Zero Shot",
+        
             )
             novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
                 dataset=self.test_novel,
