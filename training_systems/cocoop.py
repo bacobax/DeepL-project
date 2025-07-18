@@ -176,8 +176,8 @@ class CoCoOpSystem:
         )
 
         self.ignore_no_improvement = adv_training_opt.get("ignore_no_improvement", False)
-        log_dir = f"runs/CoCoOp/{self.run_name}" if not report else f"runs/report/{self.run_name}"
-        self.writer = SummaryWriter(log_dir=log_dir)
+        self.log_dir = f"runs/CoCoOp/{self.run_name}" if not report else f"runs/report/{self.run_name}"
+        self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
 
@@ -412,12 +412,18 @@ class CoCoOpSystem:
                 -1,
             )
 
-        best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
+        best_model_path = os.path.join(self.log_dir, "best_model.pth")
         # Ensure all methods are properly initialized prior to the base training phase
-        
+
         if self.train_base_checkpoint_path is None:
             # Base training phase
-            base_end_epoch, _ = self._train_base_phase(best_model_path)
+            base_end_epoch, _, best_base_epoch = self._train_base_phase(best_model_path)
+            self.best_base_epoch = best_base_epoch  # Store for later use if needed
+            # Log the best epoch to TensorBoard and logger
+            self.writer.add_scalar("Best Base Epoch", best_base_epoch, base_end_epoch)
+
+            # Also print for visibility
+            print(f"Best base model found at epoch: {best_base_epoch}")
             if self.epochs != 0:
                 print(f"[DEBUG] Loading model state dict after base phase from: {best_model_path}")
                 self.model.load_state_dict(torch.load(best_model_path))
@@ -499,7 +505,7 @@ class CoCoOpSystem:
             best_model_path (str): Path to store the best base model.
 
         Returns:
-            Tuple[int, float]: Final epoch index and best validation score.
+            Tuple[int, float, int]: Final epoch index, best validation score, and best epoch index.
         """
         best_score = 0.0
         patience = 8
@@ -508,6 +514,8 @@ class CoCoOpSystem:
         method = self.basic_train_method
         rotation_epochs = int(patience * (3/4)) if self.rotation_period == "relative" else self.rotation_period
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
+        best_epoch = -1  # Track the epoch of the best model
+        best_epoch_path = best_model_path + ".best_epoch.txt"  # Path to store best epoch
 
         for e in range(self.max_epoch):
 
@@ -563,6 +571,10 @@ class CoCoOpSystem:
                 best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
+                best_epoch = e  # Save the epoch of the best model
+                # Store the best epoch to disk
+                with open(best_epoch_path, "w") as f:
+                    f.write(str(best_epoch))
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
@@ -582,7 +594,7 @@ class CoCoOpSystem:
             pbar.update(1)
             c += 1
 
-        return c, best_score
+        return c, best_score, best_epoch
 
     def _train_adversarial_phase(self, start_epoch, best_model_path):
         """
