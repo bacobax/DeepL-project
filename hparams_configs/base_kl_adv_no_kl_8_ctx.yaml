@@ -10,6 +10,7 @@ coop:
   csc: false
 
 cocoop:
+  pseudo_base_ratio: 0.9
   cnn_model: "ViT-B/32"
   test_batch_size: 10
   optimizer_configs:
