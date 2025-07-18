@@ -41,9 +41,9 @@ cocoop:
     prompt_learner_warmup_epochs: 0
   base_training_opt:
     batch_size: 10
-    warmup_epoch: 3
+    warmup_epoch: 1
     warmup_cons_lr: 0.00001
-    epochs: 10
+    epochs: 15
   clustering_opt:
     n_clusters: 4
     variance: 0.95
