@@ -28,7 +28,7 @@ cocoop:
     class_token_position: "end"
     csc: false
   kl_loss_opt:
-    lambda_kl: [0.3, 0.1]
+    lambda_kl: [0.1, 0.1]
     using_kl: [true, false]
   adv_training_opt:
     batch_size: 10
