@@ -399,6 +399,9 @@ class CoCoOpSystem:
         """
         Execute the full training pipeline: base phase, optionally followed by adversarial training and evaluation.
         """
+        self._set_test_methods()
+        self._set_eval_method()
+        self._set_train_methods()
         if not self.skip_tests[0]:
             print("Doing base accuracy test")
             base_acc, novel_acc = self.compute_evaluation(-1, base=True)
@@ -411,9 +414,7 @@ class CoCoOpSystem:
 
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         # Ensure all methods are properly initialized prior to the base training phase
-        self._set_eval_method()
-        self._set_test_methods()
-        self._set_train_methods()
+        
         if self.train_base_checkpoint_path is None:
             # Base training phase
             base_end_epoch, _ = self._train_base_phase(best_model_path)
