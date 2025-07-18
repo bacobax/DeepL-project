@@ -47,6 +47,9 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
         #     student_logits_tmp.append(
         #         [logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in [tmp_dataset.cat2idx[c] for c in categories_novel_tensor]])
         # student_logits = torch.tensor(student_logits_tmp).to(device)
+<<<<<<< HEAD
+        print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
+=======
         # print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
         print("NaN in student_logits:", torch.isnan(student_logits).any().item())
         print("NaN in clip_logits:", torch.isnan(clip_logits).any().item())
@@ -54,6 +57,7 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
         print("Inf in clip_logits:", torch.isinf(clip_logits).any().item())
         print("student_logits:", student_logits)
         print("clip_logits:", clip_logits)
+>>>>>>> cac9d2efb13bc417b02181b3bb77bb36d9d0b8de
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
             torch.nn.functional.softmax(clip_logits, dim=-1),
