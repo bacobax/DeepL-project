@@ -147,14 +147,14 @@ class KLCoCoOp(TrainingMethod):
         metrics["kl_loss_metric"].update(kl_loss.item(), n=inputs_novel.size(0))
 
         _, predicted = logits_base.max(dim=1)
-        correct = (predicted == targets_base).sum().item()
-        total = targets_base.size(0)
+        correct = (predicted == target_remapped).sum().item()
+        total = target_remapped.size(0)
         metrics["accuracy_metric"].update(correct, n=total, raw=True)
 
         return {
             "total_loss": total_loss.item(),
             "ce_loss": loss_ce.item(),
-            "ce_accuracy": correct / targets_base.size(0),
+            "ce_accuracy": correct / target_remapped.size(0),
             "kl_loss": kl_loss.item(),
         }
 
