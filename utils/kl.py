@@ -37,9 +37,11 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
         clip_logits = image_features_clip @ text_features_clip.T
 
     remapped_class_names = [ CLASS_NAMES[ c ] for c in categories_novel_tensor ]
+    cat2local = {cat: i for i, cat in enumerate(categories_novel_tensor)}
+    target_remapped = torch.tensor([cat2local[c.item()] for c in targets_novel_tensor]).to(device)
     with model.temporary_classnames(remapped_class_names):
         model.train()
-        student_logits, student_loss = model(inputs_novel, targets_novel_tensor)  # [B, num_classes]
+        student_logits, student_loss = model(inputs_novel, target_remapped)  # [B, num_classes]
         # student_logits_tmp = []
         # for img_logits in student_logits:
         #     student_logits_tmp.append(
