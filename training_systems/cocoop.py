@@ -399,6 +399,16 @@ class CoCoOpSystem:
         """
         Execute the full training pipeline: base phase, optionally followed by adversarial training and evaluation.
         """
+        if not self.skip_tests[0]:
+            print("Doing base accuracy test")
+            base_acc, novel_acc = self.compute_evaluation(-1, base=True)
+            self._log_final_metrics(
+                "Final metrics - CLIP ZERO SHOT",
+                base_acc,
+                novel_acc,
+                -1,
+            )
+
         best_model_path = os.path.join("runs/CoCoOp", self.run_name, "best_model.pth")
         # Ensure all methods are properly initialized prior to the base training phase
         self._set_eval_method()
@@ -801,7 +811,7 @@ class CoCoOpSystem:
                 desc_add=" - Base Zero Shot",
                 classnames=self.base_classes,
             )
-            novel_metrics = self.zero_shot_pseudo_novel_test_method.evaluate(
+            novel_metrics = self.zero_shot_novel_classes_test_method.evaluate(
                 dataset=self.test_novel,
                 desc_add=" - Novel Zero Shot",
                 classnames=self.novel_classes

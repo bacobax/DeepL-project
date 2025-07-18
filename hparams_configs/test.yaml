@@ -20,7 +20,7 @@ cocoop:
       mlp_lr: 0.002
       weight_decay: 0.0005
       momentum: 0.8
-  skip_tests: [true, true, false]
+  skip_tests: [false, true, true]
   #train_base_checkpoint_path: "./bin/cocoop/NO_KL_ADV_IMG_FT_8_CTX_20250522_140018.pth"
   prompt_learner_opt:
     n_ctx: 8
