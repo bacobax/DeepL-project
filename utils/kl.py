@@ -42,7 +42,9 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     # categories_novel_tensor should be the original class labels for the current batch
     
     # No need to remap targets; they are already correct
-    target_remapped = torch.tensor([idx for idx in range(len(categories_novel_tensor))]).to(device)    
+    target_remapping = {cat:idx for idx, cat in enumerate(categories_novel_tensor)}
+    target_remapped = torch.tensor([target_remapping[c.item()] for c in targets_novel_tensor]).to(device)
+    
     with model.temporary_classnames(remapped_class_names):
         model.train()
         student_logits, student_loss = model(inputs_novel, target_remapped)  # [B, num_classes]
