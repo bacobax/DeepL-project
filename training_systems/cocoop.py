@@ -555,9 +555,9 @@ class CoCoOpSystem:
                 total_loss,
             )
 
-            base_val_acc, novel_val_acc = self._evaluate_and_log(e)
+            base_val_acc, _ = self._evaluate_and_log(e)
 
-            score = harmonic_mean([base_val_acc, novel_val_acc])
+            score = base_val_acc
 
             if score > best_score:
                 best_score = score
@@ -571,8 +571,7 @@ class CoCoOpSystem:
 
             self.lr_scheduler.step()
             pbar.set_postfix(
-                PB_val_acc=base_val_acc,
-                PN_val_acc=novel_val_acc,
+                B_val_acc=base_val_acc,
                 score=score,
                 lr=self.optimizer.param_groups[0]["lr"],
                 ce_L=ce_loss,
@@ -730,22 +729,14 @@ class CoCoOpSystem:
         else:
 
             metrics_base = self.eval_method.evaluate(
-                dataset=self.val_pseudo_base,
-                classnames=self.pseudo_base_classes,
-                desc_add=" - Pseudo Base",
+                dataset=self.val_base,
+                classnames=self.base_classes,
+                desc_add=" - Base",
             )
             base_val_loss = metrics_base["loss"]
             base_val_acc = metrics_base["accuracy"]
-
-            metrics_novel = self.eval_method.evaluate(
-
-                dataset=self.val_pseudo_novel,
-                classnames=self.pseudo_novel_classes,
-                desc_add=" - Pseudo Novel",
-            )
-
-            novel_val_loss = metrics_novel["loss"]
-            novel_val_acc = metrics_novel["accuracy"]
+            novel_val_loss = -1
+            novel_val_acc = -1
 
         self.logger.log_validation(
             epoch,
