@@ -40,9 +40,9 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     
     # targets_novel_tensor contains contiguous indices (0, 1, 2, ...)
     # categories_novel_tensor should be the original class labels for the current batch
-    categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in range(len(tmp_dataset.idx2cat))]
+    
     # No need to remap targets; they are already correct
-    target_remapped = targets_novel_tensor    
+    target_remapped = torch.tensor([idx for idx in range(len(categories_novel_tensor))]).to(device)    
     with model.temporary_classnames(remapped_class_names):
         model.train()
         student_logits, student_loss = model(inputs_novel, target_remapped)  # [B, num_classes]
