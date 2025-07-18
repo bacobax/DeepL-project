@@ -45,7 +45,7 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
         #     student_logits_tmp.append(
         #         [logit.item() for column_idx, logit in enumerate(img_logits) if column_idx in [tmp_dataset.cat2idx[c] for c in categories_novel_tensor]])
         # student_logits = torch.tensor(student_logits_tmp).to(device)
-        # print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
+        print(f"student logits shape: {student_logits.shape}, clip logits shape: {clip_logits.shape}")
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
             torch.nn.functional.softmax(clip_logits, dim=-1),
