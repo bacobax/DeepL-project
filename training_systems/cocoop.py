@@ -503,7 +503,14 @@ class CoCoOpSystem:
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
                     if e % rotation_epochs == 0:
-                        self.pseudo_base_classes, self.pseudo_novel_classes, self.train_pseudo_base, self.train_pseudo_novel, self.val_pseudo_base, self.val_pseudo_novel = self.get_next_rotation()
+                        (
+                            self.pseudo_base_classes, 
+                            self.pseudo_novel_classes, 
+                            self.train_pseudo_base, 
+                            self.train_pseudo_novel, 
+                            self.val_pseudo_base, 
+                            self.val_pseudo_novel
+                        ) = self.get_next_rotation()
                     kl_loss, ce_loss, acc = method.double_datasets_train_step(
                         self.train_pseudo_base,
                         self.train_pseudo_novel,
