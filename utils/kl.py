@@ -37,11 +37,12 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
         clip_logits = image_features_clip @ text_features_clip.T
 
     remapped_class_names = [ CLASS_NAMES[ c ] for c in categories_novel_tensor ]
-    # targets_novel_tensor: label indices (e.g., 18)
-    # categories_novel_tensor: category IDs (e.g., 5, 12, ...)
-    cat2local = {cat: i for i, cat in enumerate(categories_novel_tensor)}
-    # Map label indices to category IDs, then to local indices
-    target_remapped = torch.tensor([cat2local[tmp_dataset.idx2cat[c.item()]] for c in targets_novel_tensor]).to(device)
+    
+    # targets_novel_tensor contains contiguous indices (0, 1, 2, ...)
+    # categories_novel_tensor should be the original class labels for the current batch
+    categories_novel_tensor = [tmp_dataset.idx2cat[c] for c in range(len(tmp_dataset.idx2cat))]
+    # No need to remap targets; they are already correct
+    target_remapped = targets_novel_tensor    
     with model.temporary_classnames(remapped_class_names):
         model.train()
         student_logits, student_loss = model(inputs_novel, target_remapped)  # [B, num_classes]
