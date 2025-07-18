@@ -13,14 +13,20 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-  "base_kl_adv_no_kl_4_ctx"
-  "base_kl_adv_no_kl_8_ctx"
+  "base_kl_v1_4_ctx"
+  "base_kl_v1_8_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_3_4_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_3_8_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_4_4_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_4_8_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_rel_4_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_rel_8_ctx"
 
 )
 DEBUG="false"
 
 # This will be set inside the loop
-HPARAMS_DIR="hparams_configs"
+HPARAMS_DIR="hparams_configs/report"
 
 # === Activate Conda ===
 echo "Activating Conda..."

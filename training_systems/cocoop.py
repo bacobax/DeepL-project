@@ -105,7 +105,7 @@ class CoCoOpSystem:
         adv_training_opt=None,
         base_training_opt=None,
         clustering_opt=None,
-
+        report=False,
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -176,8 +176,8 @@ class CoCoOpSystem:
         )
 
         self.ignore_no_improvement = adv_training_opt.get("ignore_no_improvement", False)
-
-        self.writer = SummaryWriter(log_dir=f"runs/CoCoOp/{self.run_name}")
+        log_dir = f"runs/CoCoOp/{self.run_name}" if not report else f"runs/report/{self.run_name}"
+        self.writer = SummaryWriter(log_dir=log_dir)
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
 
@@ -555,9 +555,9 @@ class CoCoOpSystem:
                 total_loss,
             )
 
-            base_val_acc, _ = self._evaluate_and_log(e)
+            base_val_acc, novel_val_acc = self._evaluate_and_log(e)
 
-            score = base_val_acc
+            score = harmonic_mean([base_val_acc, novel_val_acc])
 
             if score > best_score:
                 best_score = score
@@ -572,6 +572,7 @@ class CoCoOpSystem:
             self.lr_scheduler.step()
             pbar.set_postfix(
                 B_val_acc=base_val_acc,
+                N_val_acc=novel_val_acc,
                 score=score,
                 lr=self.optimizer.param_groups[0]["lr"],
                 ce_L=ce_loss,
@@ -735,8 +736,14 @@ class CoCoOpSystem:
             )
             base_val_loss = metrics_base["loss"]
             base_val_acc = metrics_base["accuracy"]
-            novel_val_loss = -1
-            novel_val_acc = -1
+
+            metrics_novel = self.eval_method.evaluate(
+                dataset=self.val_novel,
+                classnames=self.novel_classes,
+                desc_add=" - Novel",
+            )
+            novel_val_loss = metrics_novel["loss"]
+            novel_val_acc = metrics_novel["accuracy"]  
 
         self.logger.log_validation(
             epoch,
