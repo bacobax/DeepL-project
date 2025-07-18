@@ -13,8 +13,8 @@ cocoop:
   cnn_model: "ViT-B/32"
   test_batch_size: 10
   optimizer_configs:
-    - prompt_lr: 0.002
-      weight_decay: 0.0001
+    - prompt_lr: 0.004
+      weight_decay: 0.0002
       momentum: 0.9
     - prompt_lr: 0.002
       mlp_lr: 0.002
@@ -23,7 +23,7 @@ cocoop:
   skip_tests: [true, false, false]
   #tain_base_checkpoint_path: "./bin/good_starting_point/base_kl.pth"
   prompt_learner_opt:
-    n_ctx: 8
+    n_ctx: 4
     ctx_init: ""
     class_token_position: "end"
     csc: false
