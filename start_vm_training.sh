@@ -13,6 +13,7 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
+  "base_kl_adv_no_kl_4_ctx"
   "base_kl_adv_no_kl_8_ctx"
 
 )
