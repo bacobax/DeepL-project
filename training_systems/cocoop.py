@@ -609,7 +609,7 @@ class CoCoOpSystem:
 
             score = novel_val_acc
 
-            if (score > best_score and base_val_acc > 0.76) or (not self.pat):
+            if (score > best_score) or (not self.pat):
                 best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
