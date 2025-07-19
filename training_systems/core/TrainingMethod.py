@@ -41,6 +41,7 @@ class TrainingMethod(ABC):
         self.title = title
         self.device = next(self.model.parameters()).device
         self.debug = debug
+        self.mlp_adversary = None
 
     @abstractmethod
     def get_metrics(self) -> Dict[str, AverageMeter]:
