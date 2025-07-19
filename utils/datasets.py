@@ -36,6 +36,7 @@ def get_data(data_dir="./data", transform=None, resolution=224):
     """
     if transform is None:
         transform = build_default_transform(resolution)
+        
     train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=transform)
     val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=transform)
     test = torchvision.datasets.Flowers102(root=data_dir, split="test", download=True, transform=transform)
