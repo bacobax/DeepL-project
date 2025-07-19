@@ -79,7 +79,9 @@ class OnlyMLP(TrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            accumulation_steps: int = 1,
+            step: int = 0
     ) -> Dict[str, float]:
         """
         Executes the forward and backward pass.
@@ -115,18 +117,20 @@ class OnlyMLP(TrainingMethod):
 
         loss_bce = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target)
 
-
+        loss_bce = loss_bce / accumulation_steps
         # Backward pass
         loss_bce.backward()
 
-        torch.nn.utils.clip_grad_norm_(
-            list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
-            max_norm=1.0,
-            norm_type=2.0,
-            error_if_nonfinite=True
-        )
+        if (step + 1) % accumulation_steps == 0:
+            torch.nn.utils.clip_grad_norm_(
+                list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
+                max_norm=1.0,
+                norm_type=2.0,
+                error_if_nonfinite=True
+            )
 
-        self.optimizer_step()
+            self.optimizer_step()
+            self.optimizer.zero_grad()
 
 
         # Fetch prediction and loss value

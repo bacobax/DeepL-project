@@ -87,7 +87,9 @@ class KLCoCoOp(TrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            accumulation_steps: int = 1,
+            step: int = 0
     ) -> Dict[str, float]:
         """
         Performs forward and backward passes, computing CE loss on pseudo-base and KL loss on pseudo-novel samples.
@@ -136,9 +138,13 @@ class KLCoCoOp(TrainingMethod):
         # === Combine losses ===
         total_loss = loss_ce + self.lambda_kl * kl_loss
 
+        total_loss = total_loss / accumulation_steps
         total_loss.backward()
 
-        self.optimizer_step()
+        # optimizer step every `accumulation_steps` steps
+        if (step + 1) % accumulation_steps == 0:
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
         batch_size_total = inputs_base.size(0) + inputs_novel.size(0)
 

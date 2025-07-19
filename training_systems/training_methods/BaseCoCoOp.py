@@ -63,7 +63,9 @@ class BaseCoCoOp(TrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            accumulation_steps: int = 1,
+            step: int = 0
     ) -> Dict[str, float]:
         """
         Executes the forward and backward pass for the BaseCoCoOp training method.
@@ -86,7 +88,14 @@ class BaseCoCoOp(TrainingMethod):
         logits_base, loss_ce = self.model(inputs_base, targets_base)
         # === Combine losses ===
         print("SHAPES LOGITS: ",logits_base.shape, targets_base.shape)
+        
+        loss_ce = loss_ce / accumulation_steps
         loss_ce.backward()
+
+        # optimizer step every `accumulation_steps` steps
+        if (step + 1) % accumulation_steps == 0:
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
         self.optimizer_step()
         batch_size_total = inputs_base.size(0)
