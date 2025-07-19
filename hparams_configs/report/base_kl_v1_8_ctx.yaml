@@ -12,9 +12,8 @@ coop:
 cocoop:
   report: true
   pseudo_base_ratio: 0.9
-  cnn_model: "ViT-B/32"
+  cnn_model: "ViT-B/16"
   test_batch_size: 10
-
   optimizer_configs:
     - prompt_lr: 0.004
       weight_decay: 0.0002

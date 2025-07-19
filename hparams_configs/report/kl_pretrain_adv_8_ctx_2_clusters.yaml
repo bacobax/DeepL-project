@@ -10,7 +10,7 @@ coop:
   csc: false
 
 cocoop:
-  cnn_model: "ViT-B/32"
+  cnn_model: "ViT-B/16"
   test_batch_size: 10
   train_base_checkpoint_path: "input checkpoint for base start from kl, check ctx size"
   optimizer_configs:
