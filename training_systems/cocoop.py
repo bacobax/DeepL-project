@@ -94,7 +94,7 @@ class CoCoOpSystem:
         seed=42,
         device="cuda",
         run_name="exp1",
-        cnn_model="ViT-B/32",
+        cnn_model="ViT-B/16",
         hparams_file,
         optimizer_configs=None,
         skip_tests=None,
@@ -246,9 +246,9 @@ class CoCoOpSystem:
 
         # --- Model/classnames: only pseudo_base for first phase ---
         ctx_load = (
-            "./bin/coop/exp1_ctx_only.pth"
+            "./bin/coop/coop_ctx_4_VIT16.pth"
             if self.n_ctx == 4
-            else "./bin/coop/coop_ctx_8.pth"
+            else "./bin/coop/coop_ctx_8_VIT16.pth"
         )
         cfg = EasyDict(
             {
