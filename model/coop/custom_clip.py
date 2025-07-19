@@ -93,7 +93,7 @@ class CustomCLIPCoOp(nn.Module):
         self.image_encoder = clip_model.visual
         self.text_encoder = TextEncoder(clip_model)
         self.logit_scale = clip_model.logit_scale
-        
+        self.cfg = cfg
         self.dtype = clip_model.dtype
 
     def forward(self, image, label=None):
