@@ -135,6 +135,7 @@ class CoOpSystem:
                 dataset=self.train_base,
                 optimizer=self.optimizer,
                 batch_size=self.batch_size,
+                classnames=self.base_classes,
                 device=self.device,
             )
 
@@ -143,6 +144,7 @@ class CoOpSystem:
                     model=self.model,
                     dataset=self.val_base,
                     cost_function=self.cost_function,
+                    new_classnames=self.base_classes,
                     device=self.device,
                     batch_size=self.batch_size,
                 )
@@ -226,7 +228,15 @@ class CoOpSystem:
         Returns:
             float: Accuracy on the base test set.
         """
-        base_accuracy = test_step(self.model if not base else self.clip_model, self.test_base, self.batch_size, self.device, label="test", base=base)
+        base_accuracy = test_step(
+            self.model if not base else self.clip_model, 
+            self.test_base, 
+            self.batch_size, 
+            self.device, 
+            self.base_classes,
+            label="test", 
+            base=base
+        )
         # Log to TensorBoard
         self.log_value(epoch_idx,  base_accuracy, "base_classes")
 

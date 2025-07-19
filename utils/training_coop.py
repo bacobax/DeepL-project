@@ -13,7 +13,7 @@ from utils.datasets import ContiguousLabelDataset, CLASS_NAMES
 
 
 @torch.no_grad()
-def eval_step(model, dataset, cost_function, batch_size=32, device="cuda", new_classnames=None):
+def eval_step(model, dataset, cost_function, new_classnames, batch_size=32, device="cuda"):
     """
     Evaluates the model on a given dataset using cross-entropy loss.
 
@@ -79,7 +79,7 @@ def walk_the_dataset(correct, cost_function, dataloader, device, model, total, t
     return correct, total, total_loss
 
 
-def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device="cuda"):
+def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, classnames, device="cuda"):
     """
     Performs one full training epoch for the CoOp model.
 
@@ -143,7 +143,7 @@ def training_step(model: CustomCLIPCoOp, dataset, optimizer, batch_size, device=
 
 
 @torch.no_grad()
-def test_step(model, dataset, batch_size, device, label="test", base=False):
+def test_step(model, dataset, batch_size, device, categories, label="test", base=False):
     """
     Evaluates the model using either fine-tuned or base (zero-shot) strategy.
 
@@ -159,13 +159,13 @@ def test_step(model, dataset, batch_size, device, label="test", base=False):
         float: Accuracy score.
     """
     if not base:
-        return finetuned_test_step(model, dataset, batch_size, device, label)
+        return finetuned_test_step(model, dataset, batch_size, device, categories, label)
     else:
-        return base_test_step(model, dataset, batch_size, device, label)
+        return base_test_step(model, dataset, categories, batch_size, device, label)
 
 
 @torch.no_grad()
-def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, label="test"):
+def finetuned_test_step(model: CustomCLIPCoOp, dataset, batch_size, device, categories, label="test"):
     """
     Evaluates a fine-tuned CustomCLIPCoOp model on the given dataset.
 
