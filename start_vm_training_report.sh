@@ -14,13 +14,12 @@ USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
   "base_kl_v2_80_20_kl_03_rot_period_3_4_ctx"
-  "base_kl_v2_80_20_kl_03_rot_period_3_8_ctx"
   "base_kl_v2_80_20_kl_03_rot_period_4_4_ctx"
-  "base_kl_v2_80_20_kl_03_rot_period_4_8_ctx"
   "base_kl_v2_80_20_kl_03_rot_period_rel_4_ctx"
-  "base_kl_v2_80_20_kl_03_rot_period_rel_8_ctx"
   "base_kl_v2_80_20_kl_03_rot_period_random_8_ctx"
   "base_kl_v2_80_20_kl_01_rot_period_random_8_ctx"
+  "base_kl_v2_80_20_kl_03_rot_period_random_4_ctx"
+  "base_kl_v2_80_20_kl_01_rot_period_random_4_ctx"
 )
 DEBUG="false"
 
