@@ -211,10 +211,10 @@ class CoCoOpSystem:
         
         print(f"patience {'disabled' if not self.pat else 'enabled'}")
         # Load model
-        self.clip_model, preprocess = clip.load(self.cnn_model)
+        self.clip_model, _ = clip.load(self.cnn_model)
         self.clip_model = self.clip_model.to(self.device)
-
-        self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
+        resolution = self.clip_model.visual.input_resolution
+        self.train_set, self.val_set, self.test_set = get_data(resolution=resolution)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         # --- NEW: Pseudo-base/novel split ---
 
@@ -243,7 +243,6 @@ class CoCoOpSystem:
         self.val_pseudo_novel = self.split_by_classes(self.val_base, self.pseudo_novel_classes)
 
         # --- Model/classnames: only pseudo_base for first phase ---
-        resolution = self.clip_model.visual.input_resolution
         ctx_load = (
             "./bin/coop/exp1_ctx_only.pth"
             if self.n_ctx == 4

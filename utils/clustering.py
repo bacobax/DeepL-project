@@ -67,10 +67,10 @@ def cluster_categories(device, cnn, n_clusters=2, variance=0.95, data_dir="../da
     """
 
     # initialize clip model with ViT
-    clip_model, preprocess = clip.load(cnn)
+    clip_model, _ = clip.load(cnn)
     clip_model = clip_model.to(device)
-
-    train_set, _, _ = get_data(data_dir=data_dir, transform=preprocess)
+    resolution = clip_model.visual.input_resolution
+    train_set, _, _ = get_data(data_dir=data_dir, resolution=resolution)
 
     # split classes into base and novel
     base_classes, _ = base_novel_categories(train_set)

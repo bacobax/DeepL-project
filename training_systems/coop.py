@@ -13,7 +13,7 @@ from model.coop.custom_clip import CustomCLIPCoOp
 from utils.datasets import get_data, base_novel_categories, split_data, CLASS_NAMES
 from utils.training_coop import test_step, training_step, eval_step
 import clip
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 from torch.optim import SGD, Adam
 from torch import nn
 
@@ -67,10 +67,11 @@ class CoOpSystem:
 
         # Get dataloaders
 
-        self.clip_model, preprocess = clip.load("RN50", device=self.device)
+        self.clip_model, _ = clip.load("ViT-B/16", device=self.device)
         self.clip_model = self.clip_model.to(self.device)
         self.clip_model = self.clip_model.float()
-        self.train_set, self.val_set, self.test_set = get_data(transform=preprocess)
+        resolution = self.clip_model.visual.input_resolution
+        self.train_set, self.val_set, self.test_set = get_data(resolution=resolution)
 
         # split classes into base and novel
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
@@ -195,11 +196,12 @@ class CoOpSystem:
         Args:
             path (str): Directory path where the prompt learner checkpoint will be saved.
         """
-        #create folder if not exist
+        # Create folder if not exist
         if not os.path.exists(path):
             os.makedirs(path)
-        # Save the model
-        torch.save(self.model.prompt_learner.state_dict(), os.path.join(path, f"{self.run_name}_prompt_learner.pth"))
+        # Save only the self.ctx parameter of the prompt learner
+        ctx_state = {"ctx": self.model.prompt_learner.ctx.detach().cpu()}
+        torch.save(ctx_state, os.path.join(path, f"{self.run_name}_prompt_learner.pth"))
 
     def load_model(self, path="./bin"):
         """

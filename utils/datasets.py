@@ -2,21 +2,40 @@ import clip
 import torch
 import torchvision
 from torch.utils.data import Subset
+import torchvision.transforms as T
 
 CLASS_NAMES = ["pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold", "tiger lily", "moon orchid", "bird of paradise", "monkshood", "globe thistle", "snapdragon", "colt's foot", "king protea", "spear thistle", "yellow iris", "globe-flower", "purple coneflower", "peruvian lily", "balloon flower", "giant white arum lily", "fire lily", "pincushion flower", "fritillary", "red ginger", "grape hyacinth", "corn poppy", "prince of wales feathers", "stemless gentian", "artichoke", "sweet william", "carnation", "garden phlox", "love in the mist", "mexican aster", "alpine sea holly", "ruby-lipped cattleya", "cape flower", "great masterwort", "siam tulip", "lenten rose", "barbeton daisy", "daffodil", "sword lily", "poinsettia", "bolero deep blue", "wallflower", "marigold", "buttercup", "oxeye daisy", "common dandelion", "petunia", "wild pansy", "primula", "sunflower", "pelargonium", "bishop of llandaff", "gaura", "geranium", "orange dahlia", "pink-yellow dahlia?", "cautleya spicata", "japanese anemone", "black-eyed susan", "silverbush", "californian poppy", "osteospermum", "spring crocus", "bearded iris", "windflower", "tree poppy", "gazania", "azalea", "water lily", "rose", "thorn apple", "morning glory", "passion flower", "lotus", "toad lily", "anthurium", "frangipani", "clematis", "hibiscus", "columbine", "desert-rose", "tree mallow", "magnolia", "cyclamen", "watercress", "canna lily", "hippeastrum", "bee balm", "ball moss", "foxglove", "bougainvillea", "camellia", "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"]
 
+# --- Data Augmentation Pipeline ---
+def build_default_transform(resolution=224):
+    """
+    Builds the default data augmentation pipeline as specified:
+    - RandomResizedCrop with bicubic interpolation
+    - RandomHorizontalFlip
+    - Normalize with given mean and std
+    """
+    return T.Compose([
+        T.RandomResizedCrop(resolution, interpolation=T.InterpolationMode.BICUBIC),
+        T.RandomHorizontalFlip(),
+        T.ToTensor(),
+        T.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]),
+    ])
 
-def get_data(data_dir="./data", transform=None):
+
+def get_data(data_dir="./data", transform=None, resolution=224):
     """
     Loads the Flowers102 dataset from torchvision, returning separate splits for training, validation, and testing.
 
     Args:
         data_dir (str): Directory where the dataset will be downloaded/stored. Defaults to "./data".
         transform (torchvision.transforms.Compose or None): Transformations to apply to each image.
+        resolution (int): Image resolution for transforms (default 224).
 
     Returns:
         tuple: A tuple (train, val, test) of Flowers102 dataset splits.
     """
+    if transform is None:
+        transform = build_default_transform(resolution)
     train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=transform)
     val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=transform)
     test = torchvision.datasets.Flowers102(root=data_dir, split="test", download=True, transform=transform)

@@ -15,7 +15,7 @@ from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 
 if __name__ == "__main__":
-    clip_model, preprocess = clip.load("ViT-B/32")
+    clip_model, _ = clip.load("ViT-B/32")
     resolution = clip_model.visual.input_resolution
 
     cfg = EasyDict()
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         resolution,
         resolution,
     ]  # Must match CLIP model's input resolution
-    train_set, val_set, test_set = get_data(transform=preprocess)
+    train_set, val_set, test_set = get_data(resolution=resolution)
 
     # split classes into base and novel
     base_classes, novel_classes = base_novel_categories(train_set)
