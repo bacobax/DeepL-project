@@ -46,6 +46,7 @@ cocoop:
     warmup_epoch: 1
     warmup_cons_lr: 0.00001
     epochs: 15
+    accumulation_steps: 4
   clustering_opt:
     n_clusters: 4
     variance: 0.95
