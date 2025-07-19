@@ -106,6 +106,7 @@ class CoCoOpSystem:
         base_training_opt=None,
         clustering_opt=None,
         report=False,
+        pat=True,
     ):
         """
         Initialize the CoCoOp system, load data, setup the model, loss functions, optimizers, and logger.
@@ -168,6 +169,7 @@ class CoCoOpSystem:
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
+        self.pat = pat
         print(
             "BATCH SIZES: ",
             self.test_batch_size,
@@ -176,7 +178,7 @@ class CoCoOpSystem:
         )
 
         self.ignore_no_improvement = adv_training_opt.get("ignore_no_improvement", False)
-        self.log_dir = f"runs/CoCoOp/{self.run_name}" if not report else f"runs/report/{self.run_name}"
+        self.log_dir = f"runs/CoCoOp/{self.run_name}" if not report else (f"runs/report/{self.run_name}" if self.pat else f"runs/report_no_pat/{self.run_name}")
         self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
