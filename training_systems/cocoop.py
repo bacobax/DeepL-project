@@ -517,7 +517,19 @@ class CoCoOpSystem:
         patience_counter = 0
         c = 0
         method = self.basic_train_method
-        rotation_epochs = int(patience * (3/4)) if self.rotation_period == "relative" else self.rotation_period
+
+        
+
+
+        # Initialize rotation tracking
+        if self.rotation_period == "random":
+            # For random rotation, we'll track when the next rotation should happen
+            next_rotation_epoch = random.randint(1, 4)  # Sample from 1 to 4
+            rotation_epochs = None  # Not used for random
+        else:
+            rotation_epochs = int(patience * (3/4)) if self.rotation_period == "relative" else self.rotation_period
+            next_rotation_epoch = None  # Not used for fixed/relative
+        
         pbar = tqdm(total=self.max_epoch, desc="Base Training")
         best_epoch = -1  # Track the epoch of the best model
         best_epoch_path = best_model_path + ".best_epoch.txt"  # Path to store best epoch
@@ -526,7 +538,21 @@ class CoCoOpSystem:
 
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
-                    if e % rotation_epochs == 0:
+                    # Check if rotation should happen
+                    should_rotate = False
+                    if self.rotation_period == "random":
+                        if e == next_rotation_epoch:
+                            should_rotate = True
+                            # Sample next rotation epoch (1 to 4 epochs from now)
+                            next_rotation_epoch = e + random.randint(1, 4)
+                    else:
+                        # Fixed or relative rotation
+                        if rotation_epochs is not None and e % rotation_epochs == 0:
+                            should_rotate = True
+                    
+                    if should_rotate:
+                        if self.rotation_period == "random":
+                            print(f"[DEBUG] Random rotation at epoch {e}, next rotation at epoch {next_rotation_epoch}")
                         (
                             self.pseudo_base_classes, 
                             self.pseudo_novel_classes, 
@@ -572,9 +598,9 @@ class CoCoOpSystem:
 
             base_val_acc, novel_val_acc = self._evaluate_and_log(e)
 
-            score = harmonic_mean([base_val_acc, novel_val_acc])
+            score = novel_val_acc
 
-            if score > best_score or (not self.pat):
+            if (score > best_score and base_val_acc > 0.76) or (not self.pat):
                 best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
@@ -590,15 +616,22 @@ class CoCoOpSystem:
                     break
 
             self.lr_scheduler.step()
-            pbar.set_postfix(
-                B_val_acc=base_val_acc,
-                N_val_acc=novel_val_acc,
-                score=score,
-                lr=self.optimizer.param_groups[0]["lr"],
-                ce_L=ce_loss,
-                kl_L=kl_loss,
-                pat_c=patience_counter,
-            )
+            # Prepare postfix for progress bar
+            postfix_dict = {
+                'B_val_acc': base_val_acc,
+                'N_val_acc': novel_val_acc,
+                'score': score,
+                'lr': self.optimizer.param_groups[0]["lr"],
+                'ce_L': ce_loss,
+                'kl_L': kl_loss,
+                'pat_c': patience_counter,
+            }
+            
+            # Add next rotation info for random rotation
+            if self.rotation_period == "random" and isinstance(method, DoubleDatasetTrainingMethod):
+                postfix_dict['next_rot'] = next_rotation_epoch
+            
+            pbar.set_postfix(**postfix_dict)
             pbar.update(1)
             c += 1
 

@@ -1,0 +1,55 @@
+coop:
+  batch_size: 10
+  learning_rate: 0.002
+  weight_decay: 0.0001
+  momentum: 0.9
+  epochs: 20
+  n_ctx: 8
+  ctx_init: ""
+  class_token_position: "end"
+  csc: false
+
+cocoop:
+  report: true
+  cnn_model: "ViT-B/16"
+  test_batch_size: 10
+  pseudo_base_ratio: 0.8
+  optimizer_configs:
+    - prompt_lr: 0.002
+      weight_decay: 0.0001
+      momentum: 0.9
+    - prompt_lr: 0.002
+      mlp_lr: 0.002
+      weight_decay: 0.0008
+      momentum: 0.8
+  skip_tests: [true, false, true]
+  #train_base_checkpoint_path: "./bin/good_starting_point/base_kl.pth"
+  prompt_learner_opt:
+    n_ctx: 8
+    ctx_init: ""
+    class_token_position: "end"
+    csc: false
+  kl_loss_opt:
+    lambda_kl: [0.3, 0.1]
+    using_kl: [true, false]
+    double_datasets_kl: true
+    rotation_period: "relative"
+  adv_training_opt:
+    batch_size: 10
+    warmup_lambda_adv: 2
+    adv_training_epochs: 0
+    lambda_adv: 1.5
+    grl_lambda: 1
+    mlp_opt:
+      hidden_structure: [563, 256, 128]
+    prompt_learner_warmup_epochs: 0
+  base_training_opt:
+    batch_size: 16
+    warmup_epoch: 2
+    warmup_cons_lr: 0.00001
+    epochs: 15
+  clustering_opt:
+    n_clusters: 2
+    variance: 0.95
+    vision_encoder: "ViT-B/32"
+    clustering_type: "default"
