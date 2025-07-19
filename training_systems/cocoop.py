@@ -208,9 +208,8 @@ class CoCoOpSystem:
             }
         )
 
-        print(self.skip_tests)
-        print(self.lambda_kl)
-
+        
+        print(f"patience {'disabled' if not self.pat else 'enabled'}")
         # Load model
         self.clip_model, preprocess = clip.load(self.cnn_model)
         self.clip_model = self.clip_model.to(self.device)
@@ -427,9 +426,13 @@ class CoCoOpSystem:
             # Also print for visibility
             print(f"Best base model found at epoch: {best_base_epoch}")
             if self.epochs != 0:
-                print(f"[DEBUG] Loading model state dict after base phase from: {best_model_path}")
-                self.model.load_state_dict(torch.load(best_model_path))
-                print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
+                if self.pat:
+                    print(f"[DEBUG] Loading best model state dict after base phase from: {best_model_path}")
+                    self.model.load_state_dict(torch.load(best_model_path))
+                    print(f"[DEBUG] Loaded best model with classnames: {self.model.prompt_learner.n_cls} classes")
+                else:
+                    print(f"[DEBUG] Using last model state from base phase (patience disabled)")
+                    print(f"[DEBUG] Model has classnames: {self.model.prompt_learner.n_cls} classes")
                 self.save_model(path="./bin/cocoop", prefix="after_first_train_")
 
             if not self.skip_tests[1]:
@@ -569,7 +572,7 @@ class CoCoOpSystem:
 
             score = harmonic_mean([base_val_acc, novel_val_acc])
 
-            if score > best_score:
+            if score > best_score or (not self.pat):
                 best_score = score
                 patience_counter = 0
                 torch.save(self.model.state_dict(), best_model_path)
@@ -577,6 +580,7 @@ class CoCoOpSystem:
                 # Store the best epoch to disk
                 with open(best_epoch_path, "w") as f:
                     f.write(str(best_epoch))
+                # When pat=False, we always save the current model state (last epoch)
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
@@ -664,18 +668,20 @@ class CoCoOpSystem:
             )
             if (e-start_epoch) >= self.prompt_learner_warmup_epochs:
 
+                # Always update last_model_state to track the current state
                 last_model_state = deepcopy(self.model.state_dict())
 
                 base_val_acc, novel_val_acc = self._evaluate_and_log(
                     e,
                     is_adv=True,
                 )
-                if novel_val_acc > best_novel_accuracy or self.ignore_no_improvement:
+                if novel_val_acc > best_novel_accuracy or self.ignore_no_improvement or (not self.pat):
                     best_novel_accuracy = novel_val_acc
                     print(f"[DEBUG] Saving model with classnames: {self.model.prompt_learner.n_cls} classes")
                     torch.save(self.model.state_dict(), best_model_path)
                     at_least_one_improving = True
                     patience_counter = 0
+                    # When pat=False, we always save the current model state (last epoch)
                 else:
                     patience_counter += 1
                     if patience_counter >= patience:
@@ -697,18 +703,29 @@ class CoCoOpSystem:
                 )
             pbar.update(1)
 
-        if (at_least_one_improving and self.epochs != 0) or self.ignore_no_improvement:
+        # When pat=False, we want to keep the last model state (no loading from checkpoint)
+        # When pat=True, we load the best model if there was improvement
+        if self.pat and ((at_least_one_improving and self.epochs != 0) or self.ignore_no_improvement):
             print(f"[DEBUG] Loading best model state dict after adversarial phase from: {best_model_path}")
             self.model.load_state_dict(torch.load(best_model_path))
             print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
             print("Loaded best model from adversarial checkpoint (robust, filtered mismatched keys).")
         else:
             print(
-                "No improvement during second training. Using model from last adversarial epoch."
+                "Using model from last adversarial epoch (patience disabled or no improvement)."
             )
             if last_model_state is not None:
-                self.model.load_state_dict(self.model.state_dict())
+                self.model.load_state_dict(last_model_state)
                 print("Loaded last adversarial model state.")
+            else:
+                # If last_model_state is None (e.g., still in warmup), the model already has the last state
+                # But to be safe, we can load from the saved checkpoint which should be the last state when pat=False
+                if not self.pat:
+                    print(f"[DEBUG] Loading last model state from checkpoint (patience disabled)")
+                    self.model.load_state_dict(torch.load(best_model_path))
+                    print("Loaded last adversarial model state from checkpoint.")
+                else:
+                    print("Model already has the last adversarial state (no loading needed).")
 
         return start_epoch + self.adv_training_epochs
 
