@@ -2,6 +2,7 @@ import clip
 import torch
 from torch import nn
 from torch.nn import functional as F
+from contextlib import contextmanager
 
 
 class TextEncoder(nn.Module):
@@ -28,6 +29,8 @@ class TextEncoder(nn.Module):
         
 
         return x
+
+    
 
 class PromptLearnerCoOp(nn.Module):
     def __init__(self, cfg, classnames, clip_model):
@@ -130,3 +133,33 @@ class CustomCLIPCoOp(nn.Module):
             return F.cross_entropy(logits, label), logits
 
         return logits
+    @contextmanager
+    def temporary_classnames(self, new_classnames):
+        # --- Save original state ---
+        original_classnames = self.prompt_learner.n_cls
+        original_tokenized_prompts = self.tokenized_prompts
+        original_token_prefix = self.prompt_learner.token_prefix
+        original_token_suffix = self.prompt_learner.token_suffix
+
+        # --- Apply temporary state ---
+        temp_prompt_learner = PromptLearnerCoOp(
+            cfg=self.cfg,
+            classnames=new_classnames,
+            clip_model=self.clip_model
+        )
+
+        self.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.token_prefix = temp_prompt_learner.token_prefix
+        self.prompt_learner.token_suffix = temp_prompt_learner.token_suffix
+        self.prompt_learner.n_cls = len(new_classnames)
+
+        try:
+            yield
+        finally:
+            # --- Restore original state ---
+            self.tokenized_prompts = original_tokenized_prompts
+            self.prompt_learner.tokenized_prompts = original_tokenized_prompts
+            self.prompt_learner.token_prefix = original_token_prefix
+            self.prompt_learner.token_suffix = original_token_suffix
+            self.prompt_learner.n_cls = original_classnames
