@@ -7,6 +7,7 @@ import os
 import math
 from copy import deepcopy
 from statistics import harmonic_mean
+from sympy.simplify.cse_main import preprocess_for_cse
 import torch
 from easydict import EasyDict
 from tqdm import tqdm
@@ -213,10 +214,10 @@ class CoCoOpSystem:
         
         print(f"patience {'disabled' if not self.pat else 'enabled'}")
         # Load model
-        self.clip_model, _ = clip.load(self.cnn_model)
+        self.clip_model, preprocess= clip.load(self.cnn_model)
         self.clip_model = self.clip_model.to(self.device)
         resolution = self.clip_model.visual.input_resolution
-        self.train_set, self.val_set, self.test_set = get_data(resolution=resolution)
+        self.train_set, self.val_set, self.test_set = get_data(resolution=resolution, eval_transform=preprocess)
         self.base_classes, self.novel_classes = base_novel_categories(self.train_set)
         # --- NEW: Pseudo-base/novel split ---
 

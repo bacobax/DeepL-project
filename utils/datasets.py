@@ -22,24 +22,42 @@ def build_default_transform(resolution=224):
     ])
 
 
-def get_data(data_dir="./data", transform=None, resolution=224):
+def build_eval_transform(resolution=224):
+    """
+    Builds the evaluation transform pipeline (no random augmentations):
+    - Resize to resolution
+    - CenterCrop to resolution
+    - Normalize with given mean and std
+    """
+    return T.Compose([
+        T.Resize(resolution, interpolation=T.InterpolationMode.BICUBIC),
+        T.CenterCrop(resolution),
+        T.ToTensor(),
+        T.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]),
+    ])
+
+
+def get_data(data_dir="./data", train_transform=None, eval_transform=None, resolution=224):
     """
     Loads the Flowers102 dataset from torchvision, returning separate splits for training, validation, and testing.
 
     Args:
         data_dir (str): Directory where the dataset will be downloaded/stored. Defaults to "./data".
-        transform (torchvision.transforms.Compose or None): Transformations to apply to each image.
+        train_transform (torchvision.transforms.Compose or None): Transformations to apply to training data.
+        eval_transform (torchvision.transforms.Compose or None): Transformations to apply to validation/test data.
         resolution (int): Image resolution for transforms (default 224).
 
     Returns:
         tuple: A tuple (train, val, test) of Flowers102 dataset splits.
     """
-    if transform is None:
-        transform = build_default_transform(resolution)
+    if train_transform is None:
+        train_transform = build_default_transform(resolution)
+    if eval_transform is None:
+        eval_transform = build_eval_transform(resolution)
         
-    train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=transform)
-    val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=transform)
-    test = torchvision.datasets.Flowers102(root=data_dir, split="test", download=True, transform=transform)
+    train = torchvision.datasets.Flowers102(root=data_dir, split="train", download=True, transform=train_transform)
+    val = torchvision.datasets.Flowers102(root=data_dir, split="val", download=True, transform=eval_transform)
+    test = torchvision.datasets.Flowers102(root=data_dir, split="test", download=True, transform=eval_transform)
     return train, val, test
 
 
@@ -130,6 +148,6 @@ if __name__ == "__main__":
     clip_model, preprocess = clip.load("ViT-B/32", device="mps")
     clip_model = clip_model.to("mps")
 
-    train_set, val_set, test_set = get_data(transform=preprocess, data_dir="../data")
+    train_set, val_set, test_set = get_data(train_transform=preprocess, eval_transform=preprocess, data_dir="../data")
     base_classes, novel_classes = base_novel_categories(train_set)
     print(len(base_classes))
