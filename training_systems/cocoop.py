@@ -358,7 +358,7 @@ class CoCoOpSystem:
             batch_size=self.test_batch_size,
         )
 
-    def _set_train_methods(self)
+    def _set_train_methods(self):
         """
         Initializes the training method used for both base and adversarial phases, depending on whether KL loss is enabled.
         Chooses between standard and KL-regularized training methods.

@@ -48,7 +48,7 @@ cocoop:
     batch_size: 16
     warmup_epoch: 2
     warmup_cons_lr: 0.00001
-    epochs: 25
+    epochs: 15
   clustering_opt:
     n_clusters: 2
     variance: 0.95
