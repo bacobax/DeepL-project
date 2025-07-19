@@ -268,7 +268,6 @@ class CoCoOpSystem:
             cfg=cfg,
             clip_model=self.clip_model,
         ).to(self.device)
-        print(f"[DEBUG] Model constructed with classnames: {[CLASS_NAMES[idx] for idx in self.pseudo_base_classes]}")
 
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
@@ -280,12 +279,11 @@ class CoCoOpSystem:
         self.grl = GradientReversalLayer(lambda_=self.grl_lambda)
 
         clip_dim = self.clip_model.visual.output_dim
-        print(f"ctx_dim: {self.clip_model.ln_final.weight.shape[0]}, ")
 
         self.mlp_adversary = AdversarialMLP(
             input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"]
         ).to(self.device)
-        
+
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
         self.lr_scheduler = LambdaLR(self.optimizer, self._lr_lambda)
