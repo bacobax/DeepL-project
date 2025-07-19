@@ -34,6 +34,7 @@ cocoop:
     using_kl: [true, false]
     double_datasets_kl: true
     rotation_period: 3
+    warmup_lambda_kl: 4
   adv_training_opt:
     batch_size: 10
     warmup_lambda_adv: 2

@@ -239,6 +239,15 @@ class KLCoCoOpV2(DoubleDatasetTrainingMethod):
             metrics["ce_accuracy_metric"].avg,
         ]
 
+    def update_lambda_kl(self, lambda_kl):
+        """
+        Update the lambda_kl value used for KL loss weighting.
+        
+        Args:
+            lambda_kl (float): New lambda_kl value.
+        """
+        self.lambda_kl = lambda_kl
+
 
 
 

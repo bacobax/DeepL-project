@@ -193,6 +193,8 @@ class KLCoCoOp(TrainingMethod):
             metrics["kl_loss_metric"].avg,
         ]
 
+    def update_lambda_kl(self, lambda_kl):
+        self.lambda_kl = lambda_kl
 
 
 

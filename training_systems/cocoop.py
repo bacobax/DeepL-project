@@ -151,6 +151,7 @@ class CoCoOpSystem:
         self.lambda_kl = kl_loss_opt["lambda_kl"]
         self.double_datasets_kl = kl_loss_opt.get("double_datasets_kl", False)
         self.rotation_period = kl_loss_opt.get("rotation_period", "relative")
+        self.warmup_lambda_kl = kl_loss_opt.get("warmup_lambda_kl", 0)  # Add warmup parameter
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
@@ -208,6 +209,7 @@ class CoCoOpSystem:
                 "pseudo_base_ratio": self.pseudo_base_ratio,
                 "pseudo_split_seed": self.seed,
                 "rotation_period": self.rotation_period,
+                "warmup_lambda_kl": self.warmup_lambda_kl,
             }
         )
 
@@ -356,7 +358,7 @@ class CoCoOpSystem:
             batch_size=self.test_batch_size,
         )
 
-    def _set_train_methods(self):
+    def _set_train_methods(self)
         """
         Initializes the training method used for both base and adversarial phases, depending on whether KL loss is enabled.
         Chooses between standard and KL-regularized training methods.
@@ -536,6 +538,13 @@ class CoCoOpSystem:
 
         for e in range(self.max_epoch):
 
+            # Apply lambda_kl warmup if enabled
+            if self.warmup_lambda_kl > 0 and (isinstance(method, KLCoCoOp) or isinstance(method, KLCoCoOpV2)):
+                progress = (e + 1) / self.warmup_lambda_kl
+                current_lambda_kl = 0.1 + (self.lambda_kl[0] - 0.1) * min(progress, 1)
+                # Only update lambda_kl for methods that support it (KLCoCoOp and KLCoCoOpV2)
+                method.update_lambda_kl(current_lambda_kl)
+
             if self.using_kl[0]:
                 if isinstance(method, DoubleDatasetTrainingMethod):
                     # Check if rotation should happen
@@ -626,6 +635,11 @@ class CoCoOpSystem:
                 'kl_L': kl_loss,
                 'pat_c': patience_counter,
             }
+            
+            # Add current lambda_kl value if warmup is enabled
+            if self.warmup_lambda_kl > 0 and self.using_kl[0]:
+                if isinstance(method, KLCoCoOp) or isinstance(method, KLCoCoOpV2):
+                    postfix_dict['lambda_kl'] = method.lambda_kl
             
             # Add next rotation info for random rotation
             if self.rotation_period == "random" and isinstance(method, DoubleDatasetTrainingMethod):
