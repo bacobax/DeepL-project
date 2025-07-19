@@ -121,11 +121,11 @@ class CoOpSystem:
         """
         print("Before training:")
         print("Training the model...")
-        print_epoch_interval = 2
+        print_epoch_interval = 1
         pbar = tqdm(total=self.epochs, desc="OVERALL TRAINING", position=0, leave=True)
 
         best_val_acc = 0.0
-        patience = 5
+        patience = 3
         counter = 0
         best_model_state = None
 

@@ -38,7 +38,7 @@ for HPARAMS_CONF in "${HPARAMS_CONFS[@]}"; do
     echo "Starting training on $DEVICE with config $HPARAMS_CONF..."
     if python $PYTHON_SCRIPT --debug $DEBUG --config $HPARAMS_FULL_PATH --device $DEVICE --run_name $RUN_NAME --using_coop $USING_COOP | tee $LOG_DIR/train_${HPARAMS_CONF}_$(date +"%Y%m%d_%H%M%S").log; then
         # Git operations
-        cd "runs/CoCoOp/"
+        cd "runs/CoOp/"
         git add "$RUN_NAME"
         git commit -m "Add logs for $RUN_NAME"
         git push
