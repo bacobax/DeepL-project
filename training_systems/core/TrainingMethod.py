@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Callable
 
 from torch.utils.data import DataLoader
+import torch
 from tqdm import tqdm
 
 from utils import AverageMeter, ContiguousLabelDataset
@@ -67,7 +68,7 @@ class TrainingMethod(ABC):
 
     @abstractmethod
     def forward_backward(
-            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset
+            self, sample, batch_idx, metrics: Dict[str, AverageMeter], dataset: ContiguousLabelDataset, accumulation_steps: int = 1, step: int = 0
     ) -> Dict[str, float]:
         """
         Execute forward and backward pass, compute loss, and update metrics.
@@ -121,7 +122,7 @@ class TrainingMethod(ABC):
         """
         self.model.train()
 
-    def train_step(self, dataset, batch_size, classnames):
+    def train_step(self, dataset, batch_size, classnames, accumulation_steps: int = 1):
         """
         Perform a complete training epoch, including data loading, training, and metric collection.
 
@@ -138,11 +139,24 @@ class TrainingMethod(ABC):
         dataloader = self.get_data_loader(tmp_dataset, batch_size)
         pbar = tqdm(dataloader, desc=f"Training-{self.title}", position=1, leave=False)
         for batch_idx, sample in enumerate(dataloader):
-            debug_metrics = self.forward_backward(sample, batch_idx, metrics, tmp_dataset)
+            debug_metrics = self.forward_backward(sample, batch_idx, metrics, tmp_dataset, accumulation_steps=accumulation_steps, step=batch_idx)
             pbar.set_postfix(
                 self.debug_metrics_to_pbar_args(debug_metrics)
             )
             pbar.update(1)
+        if accumulation_steps > 1:
+            if (batch_idx + 1) % accumulation_steps != 0:
+                if self.mlp_adversary is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
+                        max_norm=1.0,
+                        norm_type=2.0,
+                        error_if_nonfinite=True
+                    )
+
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+        
         return self.training_step_return(metrics)
 
 

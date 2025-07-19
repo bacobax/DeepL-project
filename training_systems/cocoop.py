@@ -168,6 +168,8 @@ class CoCoOpSystem:
         self.warmup_lambda_adv = adv_training_opt["warmup_lambda_adv"]
         self.base_batch_size = base_training_opt["batch_size"]
         self.adv_batch_size = adv_training_opt["batch_size"]
+        self.adv_accumulation_steps = adv_training_opt.get("accumulation_steps", 1)
+        self.base_accumulation_steps = base_training_opt.get("accumulation_steps", 1)
         self.prompt_learner_warmup_epochs = adv_training_opt["prompt_learner_warmup_epochs"] if "prompt_learner_warmup_epochs" in adv_training_opt else 0
         self.pat = pat
         print(
@@ -545,13 +547,15 @@ class CoCoOpSystem:
                     total_loss, acc, ce_loss, kl_loss = method.train_step(
                         self.train_pseudo_base,
                         self.base_batch_size,
-                        classnames=self.pseudo_base_classes
+                        classnames=self.pseudo_base_classes,
+                        accumulation_steps=self.base_accumulation_steps
                     )
             elif isinstance(method, BaseCoCoOp):
                 total_loss, acc = method.train_step(
                     self.train_pseudo_base,
                     self.base_batch_size,
-                    classnames=self.pseudo_base_classes
+                    classnames=self.pseudo_base_classes,
+                    accumulation_steps=self.base_accumulation_steps
                 )
                 kl_loss = None
                 ce_loss = total_loss
@@ -644,13 +648,15 @@ class CoCoOpSystem:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.base_batch_size,
-                    classnames=self.base_classes
+                    classnames=self.base_classes,
+                    accumulation_steps=self.base_accumulation_steps
                 )
             else:
                 total_loss, acc, ce_loss, adv_loss = method.train_step(
                     self.train_base,
                     self.adv_batch_size,
-                    classnames=self.base_classes
+                    classnames=self.base_classes,
+                    accumulation_steps=self.adv_accumulation_steps
                 )
                 kl_loss = None
 

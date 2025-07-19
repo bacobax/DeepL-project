@@ -86,7 +86,9 @@ class Adversarial(TrainingMethod):
             sample,
             batch_idx,
             metrics: Dict[str, AverageMeter],
-            dataset: ContiguousLabelDataset
+            dataset: ContiguousLabelDataset,
+            accumulation_steps: int = 1,
+            step: int = 0
     ) -> Dict[str, float]:
         """
         Executes the forward and backward pass.
@@ -133,14 +135,21 @@ class Adversarial(TrainingMethod):
             else:
                 ce_grads = None  # Or torch.zeros_like(...), depending on downstream use
             total_loss = ce_loss + self.lambda_adv * loss_adv
+
+            total_loss = total_loss / accumulation_steps
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(
-                list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
-                max_norm=1.0,
-                norm_type=2.0,
-                error_if_nonfinite=True
-            )
-            self.optimizer_step()
+
+            # --- accumulate grads and update ---
+            if (step + 1) % accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(
+                    list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
+                    max_norm=1.0,
+                    norm_type=2.0,
+                    error_if_nonfinite=True
+                )
+                self.optimizer_step()
+                self.optimizer.zero_grad()
+            
             if batch_idx < 3 and self.debug:  # Log only a few batches for performance
                 print(f"[Batch {batch_idx}] CE Loss: {ce_loss.item():.4f} | "
                       f"Adv Loss: {loss_adv.item():.4f} | "
