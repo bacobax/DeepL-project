@@ -12,7 +12,7 @@ coop:
 cocoop:
   cnn_model: "ViT-B/16"
   test_batch_size: 10
-  train_base_checkpoint_path: "./bin/cocoop/after_first_train_from_yaml_base_kl_v2_80_20_kl_03_rot_period_3_4_ctx_balanced_20250720_134756.pth"
+  train_base_checkpoint_path: "./bin/cocoop/after_first_train_from_yaml_base_kl_v2_80_20_kl_01_rot_period_3_8_ctx_20250719_193750.pth"
   optimizer_configs:
     - prompt_lr: 0.002
       weight_decay: 0.0001
@@ -23,7 +23,7 @@ cocoop:
       momentum: 0.8
   skip_tests: [true, true, false]
   prompt_learner_opt:
-    n_ctx: 4
+    n_ctx: 8
     ctx_init: ""
     class_token_position: "end"
     csc: false
