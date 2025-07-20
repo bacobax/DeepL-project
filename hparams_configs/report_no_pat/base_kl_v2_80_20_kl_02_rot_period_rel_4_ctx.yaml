@@ -12,7 +12,7 @@ coop:
 cocoop:
   pat: false
   report: true
-  cnn_model: "ViT-B/32"
+  cnn_model: "ViT-B/16"
   test_batch_size: 10
   pseudo_base_ratio: 0.8
   optimizer_configs:
@@ -31,7 +31,7 @@ cocoop:
     class_token_position: "end"
     csc: false
   kl_loss_opt:
-    lambda_kl: [0.3, 0.1]
+    lambda_kl: [0.2, 0.1]
     using_kl: [true, false]
     double_datasets_kl: true
     rotation_period: "relative"
