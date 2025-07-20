@@ -281,6 +281,9 @@ class CoCoOpSystem:
             clip_model=self.clip_model,
         ).to(self.device)
 
+        # Print all dtypes of every component inside CustomCLIP
+        self.model.print_all_dtypes()
+
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
                 param.requires_grad_(False)

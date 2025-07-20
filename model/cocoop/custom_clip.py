@@ -149,3 +149,35 @@ class CustomCLIP(nn.Module):
 
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
+
+    def print_all_dtypes(self):
+        print(f"CustomCLIP dtype: {self.dtype}")
+        print(f"  logit_scale dtype: {getattr(self.logit_scale, 'dtype', type(self.logit_scale))}")
+        print(f"  tokenized_prompts dtype: {getattr(self.tokenized_prompts, 'dtype', type(self.tokenized_prompts))}")
+        print(f"  image_encoder: {type(self.image_encoder)}")
+        for name, param in self.image_encoder.named_parameters():
+            print(f"    image_encoder param {name}: {param.dtype}")
+        for name, buf in self.image_encoder.named_buffers():
+            print(f"    image_encoder buffer {name}: {buf.dtype}")
+        print(f"  text_encoder: {type(self.text_encoder)}")
+        for name, param in self.text_encoder.named_parameters():
+            print(f"    text_encoder param {name}: {param.dtype}")
+        for name, buf in self.text_encoder.named_buffers():
+            print(f"    text_encoder buffer {name}: {buf.dtype}")
+        print(f"  prompt_learner: {type(self.prompt_learner)}")
+        for name, param in self.prompt_learner.named_parameters():
+            print(f"    prompt_learner param {name}: {param.dtype}")
+        for name, buf in self.prompt_learner.named_buffers():
+            print(f"    prompt_learner buffer {name}: {buf.dtype}")
+        # Also print dtype for ctx, token_prefix, token_suffix if present
+        if hasattr(self.prompt_learner, 'ctx'):
+            print(f"    prompt_learner.ctx dtype: {self.prompt_learner.ctx.dtype}")
+        if hasattr(self.prompt_learner, 'token_prefix'):
+            print(f"    prompt_learner.token_prefix dtype: {self.prompt_learner.token_prefix.dtype}")
+        if hasattr(self.prompt_learner, 'token_suffix'):
+            print(f"    prompt_learner.token_suffix dtype: {self.prompt_learner.token_suffix.dtype}")
+        print(f"  clip_model: {type(self.clip_model)}")
+        for name, param in self.clip_model.named_parameters():
+            print(f"    clip_model param {name}: {param.dtype}")
+        for name, buf in self.clip_model.named_buffers():
+            print(f"    clip_model buffer {name}: {buf.dtype}")
