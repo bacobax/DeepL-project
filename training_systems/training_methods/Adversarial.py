@@ -138,7 +138,7 @@ class Adversarial(TrainingMethod):
 
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
-            print(f"epoch: {self.epoch}, step: {step}, total_loss: {total_loss.item():.4f}, ")
+            print(f"step: {step}, total_loss: {total_loss.item():.4f}, accumulation_steps: {accumulation_steps}, ")
             # --- accumulate grads and update ---
             if (step + 1) % accumulation_steps == 0:
                 torch.nn.utils.clip_grad_norm_(
