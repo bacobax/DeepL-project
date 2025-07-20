@@ -50,7 +50,7 @@ cocoop:
     warmup_epoch: 0
     warmup_cons_lr: 0.00001 
   clustering_opt:
-    n_clusters: 2
+    n_clusters: 4
     variance: 0.95
     vision_encoder: "ViT-B/32"
     clustering_type: "semantic"
