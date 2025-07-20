@@ -123,6 +123,8 @@ class CoCoOpSystem:
             debug (bool): Enables logging of additional debug information.
             prompt_learner_opt, kl_loss_opt, adv_training_opt, base_training_opt: Configuration dictionaries.
         """
+
+        print(f"run_name: {run_name}, using {cnn_model}, pat: {pat}")
         # --- Set global seed for reproducibility ---
         self.seed = seed if seed is not None else 42
         set_global_seed(self.seed)
@@ -188,7 +190,7 @@ class CoCoOpSystem:
             self.log_dir = f"runs/report/{self.run_name}"
         else:
             self.log_dir = f"runs/report_no_pat/{self.run_name}"
-            
+
         self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
