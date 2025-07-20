@@ -182,7 +182,13 @@ class CoCoOpSystem:
         )
 
         self.ignore_no_improvement = adv_training_opt.get("ignore_no_improvement", False)
-        self.log_dir = f"runs/CoCoOp/{self.run_name}" if not report else (f"runs/report/{self.run_name}" if self.pat else f"runs/report_no_pat/{self.run_name}")
+        if not report:
+            self.log_dir = f"runs/CoCoOp/{self.run_name}"
+        elif self.pat:
+            self.log_dir = f"runs/report/{self.run_name}"
+        else:
+            self.log_dir = f"runs/report_no_pat/{self.run_name}"
+            
         self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text("Hparams yaml file", hparams_file)
         self.logger = TensorboardLogger(self.writer)
