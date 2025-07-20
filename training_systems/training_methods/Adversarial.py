@@ -117,7 +117,14 @@ class Adversarial(TrainingMethod):
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
             logits, ce_loss, img_features, ctx, bias, avg_txt_features = self.model(inputs, targets, get_image_features=True)
-            concat = torch.cat([avg_txt_features, logits], dim=1).to(dtype=torch.float32)
+
+            if self.gaussian_noise > 0:
+                noise = torch.randn_like(logits) * self.gaussian_noise
+                noisy_logits = logits + noise
+            else:
+                noisy_logits = logits
+
+            concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
             reversed_logits = self.grl(concat)
             cluster_logits = self.mlp_adversary(reversed_logits)
 

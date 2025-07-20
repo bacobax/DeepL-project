@@ -155,6 +155,7 @@ class CoCoOpSystem:
         self.rotation_period = kl_loss_opt.get("rotation_period", "relative")
         self.warmup_lambda_kl = kl_loss_opt.get("warmup_lambda_kl", 0)  # Add warmup parameter
         self.lambda_adv = adv_training_opt["lambda_adv"]
+        self.gaussian_noise = adv_training_opt.get("gaussian_noise", 0.0)
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
         self.warmup_epoch = base_training_opt["warmup_epoch"]

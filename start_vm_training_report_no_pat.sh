@@ -13,13 +13,16 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-    "kl_pretrain_adv_4_ctx_4_clusters_adv_3"
+    "kl_pretrain_adv_4_ctx_4_clusters_adv_3_noise"
+    "all_adv_4_ctx_4_clusters"
+    "all_adv_4_ctx_4_clusters_adv_3"
+    "all_adv_4_ctx_4_clusters_adv_3_noise"
     "kl_pretrain_adv_4_ctx_2_clusters"
     "kl_pretrain_adv_8_ctx_2_clusters"
     "all_adv_8_ctx_2_clusters"
     "all_adv_8_ctx_4_clusters"
     "all_adv_4_ctx_2_clusters"
-    "all_adv_4_ctx_4_clusters"
+    
 )
 DEBUG="false"
 
