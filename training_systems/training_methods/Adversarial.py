@@ -147,6 +147,10 @@ class Adversarial(TrainingMethod):
                     norm_type=2.0,
                     error_if_nonfinite=True
                 )
+                if step == 1:
+                    for name, param in self.model.named_parameters():
+                        if param.requires_grad:
+                            print(f"UNfrozen param: {name}")
                 self.optimizer_step()
                 self.optimizer.zero_grad()
             

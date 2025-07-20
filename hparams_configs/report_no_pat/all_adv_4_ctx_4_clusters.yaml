@@ -10,6 +10,7 @@ coop:
   csc: false
 
 cocoop:
+  report: true
   pat: false
   cnn_model: "ViT-B/16"
   test_batch_size: 10
