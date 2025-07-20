@@ -388,6 +388,7 @@ class CoCoOpSystem:
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
                 tmp_classes=self.base_classes, 
+                gaussian_noise=self.gaussian_noise
             )
             
         if self.using_kl[0]:

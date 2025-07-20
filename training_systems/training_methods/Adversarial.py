@@ -35,6 +35,7 @@ class Adversarial(TrainingMethod):
             lambda_adv,
             tmp_classes: list,
             debug: bool = False,
+            gaussian_noise: float = 0.0
     ) -> None:
         """
         Args:
@@ -52,6 +53,7 @@ class Adversarial(TrainingMethod):
         self.mlp_adversary = mlp_adversary
         self.lambda_adv = lambda_adv
         self.tmp_classes = tmp_classes
+        self.gaussian_noise = gaussian_noise
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
