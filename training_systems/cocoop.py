@@ -156,6 +156,7 @@ class CoCoOpSystem:
         self.warmup_lambda_kl = kl_loss_opt.get("warmup_lambda_kl", 0)  # Add warmup parameter
         self.lambda_adv = adv_training_opt["lambda_adv"]
         self.gaussian_noise = adv_training_opt.get("gaussian_noise", 0.0)
+        self.use_bias_ctx = adv_training_opt.get("use_bias_ctx", False)
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
         self.warmup_epoch = base_training_opt["warmup_epoch"]
@@ -287,7 +288,7 @@ class CoCoOpSystem:
         ).to(self.device)
 
         # Print all dtypes of every component inside CustomCLIP
-        self.model.print_all_dtypes()
+        # self.model.print_all_dtypes()
 
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
@@ -388,7 +389,8 @@ class CoCoOpSystem:
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
                 tmp_classes=self.base_classes, 
-                gaussian_noise=self.gaussian_noise
+                gaussian_noise=self.gaussian_noise,
+                use_bias_ctx=self.use_bias_ctx
             )
             
         if self.using_kl[0]:
