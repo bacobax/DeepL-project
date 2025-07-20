@@ -138,27 +138,31 @@ class Adversarial(TrainingMethod):
 
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
-            print(f"step: {step}, total_loss: {total_loss.item():.4f}, accumulation_steps: {accumulation_steps}, ")
+            # print(f"step: {step}, total_loss: {total_loss.item():.4f}, accumulation_steps: {accumulation_steps}, ")
             # --- accumulate grads and update ---
-            if (step + 1) % accumulation_steps == 0:
-                print("Updating model and adversary parameters...")
+            if (step + 1) % accumulation_steps == 0: 
                 torch.nn.utils.clip_grad_norm_(
                     list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
                     max_norm=1.0,
                     norm_type=2.0,
                     error_if_nonfinite=True
                 )
-                if step == 1:
-                    for name, param in self.model.named_parameters():
-                        if param.requires_grad:
-                            print(f"prompt_learner Not frozen param: {name}")
-                        else:
-                            print(f"prompt_learner Frozen param: {name}")
-                    for name, param in self.mlp_adversary.named_parameters():
-                        if param.requires_grad:
-                            print(f"Adversary Not Frozen param: {name}")
-                        else:
-                            print(f"Adversary Frozen param: {name}")
+                # if step == 1:
+                #     for name, param in self.model.named_parameters():
+                #         if param.requires_grad:
+                #             print(f"prompt_learner Not frozen param: {name}")
+                #         else:
+                #             print(f"prompt_learner Frozen param: {name}")
+                #     for name, param in self.mlp_adversary.named_parameters():
+                #         if param.requires_grad:
+                #             print(f"Adversary Not Frozen param: {name}")
+                #         else:
+                #             print(f"Adversary Frozen param: {name}")
+                #     for param in self.mlp_adversary.parameters():
+                #         if param.requires_grad:
+                #             print(f"Adversary param: {param.shape}, requires_grad: {param.requires_grad}")
+                #         else:
+                #             print(f"Adversary Frozen param: {param.shape}, requires_grad: {param.requires_grad}")
                 self.optimizer_step()
                 self.optimizer.zero_grad()
             

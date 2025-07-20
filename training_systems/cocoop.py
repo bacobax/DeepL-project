@@ -127,7 +127,7 @@ class CoCoOpSystem:
         print(f"run_name: {run_name}, using {cnn_model}, pat: {pat}")
         # --- Set global seed for reproducibility ---
         self.seed = seed if seed is not None else 42
-        set_global_seed(self.seed)
+        # set_global_seed(self.seed)
         # --- End reproducibility ---
         assert prompt_learner_opt is not None, "prompt_learner_opt must be provided"
         assert kl_loss_opt is not None, "kl_loss_opt must be provided"
