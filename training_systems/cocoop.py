@@ -683,10 +683,12 @@ class CoCoOpSystem:
             method.update_lambda_adv(new_lambda_adv)
 
             if (e-start_epoch) < self.prompt_learner_warmup_epochs:
+                print(f"[DEBUG] Prompt learner FROZEN at adv epoch {e-start_epoch}")
                 for name, param in self.model.named_parameters():
                     if "prompt_learner" in name:
                         param.requires_grad_(False)
             elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
+                print(f"prompt learner UNFROZEN at adv epoch {e-start_epoch}")
                 for name, param in self.model.named_parameters():
                     if "prompt_learner" in name:
                         param.requires_grad_(True)
