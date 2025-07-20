@@ -13,9 +13,14 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-    "base_kl_v2_80_20_kl_01_rot_period_4_4_ctx_base_acc"
-    "base_kl_v2_80_20_kl_03_rot_period_rel_4_ctx_novel_acc"
-    "base_kl_v2_80_20_kl_03_rot_period_3_4_ctx_balanced"
+    "kl_pretrain_adv_4_ctx_4_clusters"
+    "kl_pretrain_adv_8_ctx_4_clusters"
+    "kl_pretrain_adv_4_ctx_2_clusters"
+    "kl_pretrain_adv_8_ctx_2_clusters"
+    "all_adv_8_ctx_2_clusters"
+    "all_adv_8_ctx_4_clusters"
+    "all_adv_4_ctx_2_clusters"
+    "all_adv_4_ctx_4_clusters"
 )
 DEBUG="false"
 
