@@ -692,6 +692,10 @@ class CoCoOpSystem:
                 for name, param in self.model.named_parameters():
                     if "prompt_learner" in name:
                         param.requires_grad_(True)
+                # print the frozen parameters name
+                for name, param in self.model.named_parameters():
+                    if param.requires_grad:
+                        print(f"UNfrozen param: {name}")
 
             if self.using_kl[1]:
                 total_loss, acc, ce_loss, kl_loss, adv_loss = method.train_step(
