@@ -519,7 +519,7 @@ class CoCoOpSystem:
         patience_counter = 0
         c = 0
         method = self.basic_train_method
-
+        evaluation_period = 1 if self.pat else 2
         
 
 
@@ -604,47 +604,37 @@ class CoCoOpSystem:
                 kl_loss,
                 total_loss,
             )
-
-            base_val_acc, novel_val_acc = self._evaluate_and_log(e)
-
-            score = novel_val_acc
-
-            if (score > best_score) or (not self.pat):
-                best_score = score
-                patience_counter = 0
-                torch.save(self.model.state_dict(), best_model_path)
-                best_epoch = e  # Save the epoch of the best model
-                # Store the best epoch to disk
-                with open(best_epoch_path, "w") as f:
-                    f.write(str(best_epoch))
-                # When pat=False, we always save the current model state (last epoch)
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"Early stopping at epoch {e}")
-                    break
-
-            self.lr_scheduler.step()
-            # Prepare postfix for progress bar
             postfix_dict = {
-                'B_val_acc': base_val_acc,
-                'N_val_acc': novel_val_acc,
-                'score': score,
                 'lr': self.optimizer.param_groups[0]["lr"],
                 'ce_L': ce_loss,
                 'kl_L': kl_loss,
                 'pat_c': patience_counter,
             }
+            if e % evaluation_period == 0:
+                base_val_acc, novel_val_acc = self._evaluate_and_log(e)
+
+                score = novel_val_acc
+
+                if (score > best_score) or (not self.pat):
+                    best_score = score
+                    patience_counter = 0
+                    torch.save(self.model.state_dict(), best_model_path)
+                    best_epoch = e  # Save the epoch of the best model
+                    # Store the best epoch to disk
+                    with open(best_epoch_path, "w") as f:
+                        f.write(str(best_epoch))
+                    # When pat=False, we always save the current model state (last epoch)
+                else:
+                    patience_counter += 1
+                    if patience_counter >= patience:
+                        print(f"Early stopping at epoch {e}")
+                        break
+
+                postfix_dict["B_val_acc"] = base_val_acc
+                postfix_dict["N_val_acc"] = novel_val_acc
+                postfix_dict["score"] = score
             
-            # Add current lambda_kl value if warmup is enabled
-            if self.warmup_lambda_kl > 0 and self.using_kl[0]:
-                if isinstance(method, KLCoCoOp) or isinstance(method, KLCoCoOpV2):
-                    postfix_dict['lambda_kl'] = method.lambda_kl
-            
-            # Add next rotation info for random rotation
-            if self.rotation_period == "random" and isinstance(method, DoubleDatasetTrainingMethod):
-                postfix_dict['next_rot'] = next_rotation_epoch
-            
+            self.lr_scheduler.step()
             pbar.set_postfix(**postfix_dict)
             pbar.update(1)
             c += 1
