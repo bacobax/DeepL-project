@@ -129,8 +129,12 @@ class Adversarial(TrainingMethod):
                 noisy_logits = logits
 
             if self.use_bias_ctx:
-                concat = torch.cat([bias, ctx], dim=1).to(dtype=torch.float32)
-                print(f"Using bias+ctx: {concat.shape}")
+                if ctx.shape[0] == 1:
+                    ctx = ctx.expand(bias.shape[0], -1, -1)  # repeat ctx for batch
+
+                concat = torch.cat([bias, ctx], dim=1)  # or dim=2 depending on what you want
+                print(f"ctx shape: {ctx.shape}, bias shape: {bias.shape}, concat shape: {concat.shape}")
+
             else:
                 concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
             reversed_logits = self.grl(concat)
