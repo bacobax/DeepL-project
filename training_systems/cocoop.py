@@ -238,6 +238,10 @@ class CoCoOpSystem:
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
+        print(f"Base classes length: {len(self.base_classes)}, Novel classes length: {len(self.novel_classes)}")
+        print(f"Train base length: {len(self.train_base)}, Val base length: {len(self.val_base)}, Test base length: {len(self.test_base)}")
+        print(f"Val novel length: {len(self.val_novel)}, Test novel length: {len(self.test_novel)}")
+
 
         self.rotation_steps = int(len(self.base_classes)*(1-self.pseudo_base_ratio))
 
