@@ -137,8 +137,10 @@ class Adversarial(TrainingMethod):
 
             else:
                 concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
-            reversed_logits = self.grl(concat)
-            cluster_logits = self.mlp_adversary(reversed_logits)
+            print(f"concat shape: {concat.shape}, bias shape: {bias.shape}, ctx shape: {ctx.shape}, avg_txt_features shape: {avg_txt_features.shape}, logits shape: {logits.shape}")
+            reversed_concat = self.grl(concat)
+            print(f"reversed_concat shape: {reversed_concat.shape}")
+            cluster_logits = self.mlp_adversary(reversed_concat)
 
             if cluster_logits.shape[1] == 1:
                 # Binary classification
