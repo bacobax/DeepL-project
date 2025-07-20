@@ -458,7 +458,8 @@ class CoCoOpSystem:
             base_end_epoch = 0
             print("Skipping base training")
             print(f"[DEBUG] Loading model state dict from: {self.train_base_checkpoint_path}")
-            self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
+            with self.model.temporary_classnames([CLASS_NAMES[c] for c in self.base_classes]):
+                self.model.load_state_dict(torch.load(self.train_base_checkpoint_path))
             print(f"[DEBUG] Loaded model with classnames: {self.model.prompt_learner.n_cls} classes")
 
         # Re-initialize test/eval/train methods after loading/training model and before adversarial phase
