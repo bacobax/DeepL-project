@@ -141,6 +141,7 @@ class Adversarial(TrainingMethod):
             print(f"step: {step}, total_loss: {total_loss.item():.4f}, accumulation_steps: {accumulation_steps}, ")
             # --- accumulate grads and update ---
             if (step + 1) % accumulation_steps == 0:
+                print("Updating model and adversary parameters...")
                 torch.nn.utils.clip_grad_norm_(
                     list(self.model.parameters()) + list(self.mlp_adversary.parameters()),
                     max_norm=1.0,
