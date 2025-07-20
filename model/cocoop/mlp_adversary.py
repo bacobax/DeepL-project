@@ -43,14 +43,21 @@ class GradientReversalLayer(nn.Module):
 
 
 class AdversarialMLP(nn.Module):
-    def __init__(self, input_dim, opt, output_dim=1):
+    def __init__(self, input_dim, opt, output_dim=1, use_bias_ctx=False, n_ctx=4):
         super().__init__()
         hidden_dims = opt.hidden_structure
 
         layers = []
 
-        for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
-            layers.append(ResidualBlock(in_dim, out_dim))
+        if use_bias_ctx:
+            # Add a bias context layer if specified
+            layers.append(nn.Linear(512*n_ctx, hidden_dims[0]))
+            layers.append(nn.ReLU())
+            for in_dim, out_dim in zip(hidden_dims[:0], hidden_dims[1:]):
+                layers.append(ResidualBlock(in_dim, out_dim))
+        else:
+            for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
+                layers.append(ResidualBlock(in_dim, out_dim))
 
         # Final output layer with configurable output_dim
         layers.append(nn.Linear(hidden_dims[-1], output_dim))

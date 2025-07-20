@@ -302,7 +302,7 @@ class CoCoOpSystem:
         clip_dim = self.clip_model.visual.output_dim
 
         self.mlp_adversary = AdversarialMLP(
-            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"]
+            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"], use_bias_ctx=self.use_bias_ctx, n_ctx=self.n_ctx
         ).to(self.device)
 
         print("mlp adversary struct: ", self.mlp_adversary)

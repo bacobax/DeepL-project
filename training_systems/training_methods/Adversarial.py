@@ -130,10 +130,10 @@ class Adversarial(TrainingMethod):
 
             if self.use_bias_ctx:
                 if ctx.shape[0] == 1:
-                    ctx = ctx.expand(bias.shape[0], -1, -1)  # repeat ctx for batch
+                    ctx = ctx.expand(bias.shape[0], -1, -1)
 
-                concat = torch.cat([bias, ctx], dim=1)  # or dim=2 depending on what you want
-                print(f"ctx shape: {ctx.shape}, bias shape: {bias.shape}, concat shape: {concat.shape}")
+                ctx_shifted = ctx + bias  # shape: [B, L, D]
+                concat = ctx_shifted.view(ctx_shifted.size(0), -1).to(dtype=torch.float32)
 
             else:
                 concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
