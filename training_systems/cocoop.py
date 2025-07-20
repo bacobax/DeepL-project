@@ -685,11 +685,10 @@ class CoCoOpSystem:
             if (e-start_epoch) < self.prompt_learner_warmup_epochs:
                 print(f"[DEBUG] Prompt learner FROZEN at adv epoch {e-start_epoch}")
                 for name, param in self.model.named_parameters():
-                    print(f"name param: {name}")
                     if "prompt_learner" in name:
                         param.requires_grad_(False)
-                print(f"prompt learner UNFROZEN at adv epoch {e-start_epoch}")
             elif (e-start_epoch) == self.prompt_learner_warmup_epochs:
+                print(f"prompt learner UNFROZEN at adv epoch {e-start_epoch}")
                 for name, param in self.model.named_parameters():
                     if "prompt_learner" in name:
                         param.requires_grad_(True)
