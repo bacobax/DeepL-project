@@ -159,6 +159,11 @@ class Adversarial(TrainingMethod):
                             print(f"Adversary Not Frozen param: {name}")
                         else:
                             print(f"Adversary Frozen param: {name}")
+                    for param in self.mlp_adversary.parameters():
+                        if param.requires_grad:
+                            print(f"Adversary param: {param.shape}, requires_grad: {param.requires_grad}")
+                        else:
+                            print(f"Adversary Frozen param: {param.shape}, requires_grad: {param.requires_grad}")
                 self.optimizer_step()
                 self.optimizer.zero_grad()
             
