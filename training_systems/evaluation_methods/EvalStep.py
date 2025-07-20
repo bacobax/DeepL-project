@@ -30,8 +30,6 @@ class EvalStep(EvaluationMethod):
         loss_meter = AverageMeter()
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset, classnames)
-        # dataset size
-        print(f"Evaluating on {len(tmp_dataset)} samples")
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=1)
 
         remapped_classnames = [ CLASS_NAMES[ tmp_dataset.idx2cat[i] ] for i in range(len(tmp_dataset.idx2cat)) ]
