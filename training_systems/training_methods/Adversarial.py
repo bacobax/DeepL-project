@@ -151,7 +151,14 @@ class Adversarial(TrainingMethod):
                 if step == 1:
                     for name, param in self.model.named_parameters():
                         if param.requires_grad:
-                            print(f"UNfrozen param: {name}")
+                            print(f"prompt_learner Not frozen param: {name}")
+                        else:
+                            print(f"prompt_learner Frozen param: {name}")
+                    for name, param in self.mlp_adversary.named_parameters():
+                        if param.requires_grad:
+                            print(f"Adversary Not Frozen param: {name}")
+                        else:
+                            print(f"Adversary Frozen param: {name}")
                 self.optimizer_step()
                 self.optimizer.zero_grad()
             
