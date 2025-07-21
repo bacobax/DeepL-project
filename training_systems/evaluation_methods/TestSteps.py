@@ -42,7 +42,8 @@ class ZeroShotTestStep(EvaluationMethod):
 
     @torch.no_grad()
     def walk(self, dataloader, accuracy_meter, desc_add):
-        for image, target in tqdm(dataloader, desc="Test (Zero Shots) " + desc_add, position=1, leave=False):
+        pbar = tqdm(total=len(dataloader), desc="Test (Zero Shots) " + desc_add, position=1, leave=False)
+        for image, target in dataloader:
             # base categories range from 0 to 50, while novel ones from 51 to 101
             # therefore we must map categories to the [0, 50], otherwise we will have wrong predictions
             # Map targets in contiguous set starting from zero
@@ -62,6 +63,10 @@ class ZeroShotTestStep(EvaluationMethod):
 
             correct = (predicted_class == target).sum().item()
             accuracy_meter.update(correct, n=target.size(0), raw=True)
+            pbar.set_postfix({
+                "accuracy" : accuracy_meter.avg
+            })
+            pbar.update(1)
 
 
 class FineTunedTestStep(EvaluationMethod):
@@ -75,14 +80,19 @@ class FineTunedTestStep(EvaluationMethod):
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset, classnames)
         dataloader = DataLoader(tmp_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
-        remapped_class_names = [ CLASS_NAMES[ tmp_dataset.idx2cat[i] ] for i in range(len(tmp_dataset.idx2cat)) ]
+        remapped_class_names = [CLASS_NAMES[tmp_dataset.idx2cat[i]] for i in range(len(tmp_dataset.idx2cat))]
         with self.model.temporary_classnames(remapped_class_names):
-            for images, targets in tqdm(dataloader, desc="Test (FineTuned) " + desc_add, position=1, leave=False):
+            pbar = tqdm(total=len(dataloader), desc="Test (Finetuned) " + desc_add, position=1, leave=False)
+            for images, targets in dataloader:
                 images = images.to(self.device)
                 targets = targets.to(self.device)
                 logits = self.model(images)
                 predictions = logits.argmax(dim=-1)
                 correct = (predictions == targets).sum().item()
                 accuracy_meter.update(correct, n=targets.size(0), raw=True)
+                pbar.set_postfix({
+                    "accuracy": accuracy_meter.avg
+                })
+                pbar.update(1)
 
         return {"accuracy": accuracy_meter.avg}

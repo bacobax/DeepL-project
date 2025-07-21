@@ -53,6 +53,26 @@ class CustomCLIP(nn.Module):
         self.cfg = cfg
 
 
+    def change_classnames(self, new_classnames):
+        """
+        Change the class names and update the prompt learner's tokenized prompts accordingly.
+
+        Args:
+            new_classnames (list): List of new class names.
+        """
+        temp_prompt_learner = PromptLearner(
+            cfg=self.cfg,
+            classnames=new_classnames,
+            clip_model=self.clip_model
+        )
+
+        self.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.tokenized_prompts = temp_prompt_learner.tokenized_prompts
+        self.prompt_learner.token_prefix = temp_prompt_learner.token_prefix
+        self.prompt_learner.token_suffix = temp_prompt_learner.token_suffix
+        self.prompt_learner.n_cls = len(new_classnames)
+
+
 
     @contextmanager
     def temporary_classnames(self, new_classnames):
@@ -181,3 +201,44 @@ class CustomCLIP(nn.Module):
             print(f"    clip_model param {name}: {param.dtype}")
         for name, buf in self.clip_model.named_buffers():
             print(f"    clip_model buffer {name}: {buf.dtype}")
+    @staticmethod
+    def load_from_checkpoint(classnames, checkpoint_path, device, n_ctx, clip_model, ctx_init=""):
+        """
+        Load a CustomCLIP model from a saved checkpoint.
+
+        Args:
+            classnames (list): List of class names for the model.
+            checkpoint_path (str): Path to the saved checkpoint file.
+            device (str): Device to load the model onto (e.g., 'cuda', 'cpu').
+
+        Returns:
+            CustomCLIP: An instance of CustomCLIP loaded with the checkpoint.
+        """
+        ctx_load = (
+            "../bin/coop/coop_ctx_4_VIT16.pth"
+            if n_ctx == 4
+            else "../bin/coop/coop_ctx_8_VIT16.pth"
+        )
+        resolution = clip_model.visual.input_resolution
+        cfg = EasyDict(
+            {
+                "TRAINER": {
+                    "COCOOP": {
+                        "CTX_LOAD": ctx_load,
+                        "N_CTX": n_ctx,
+                        "CTX_INIT": ctx_init,
+                        "PREC": "fp16",
+                    }
+                },
+                "INPUT": {"SIZE": [resolution, resolution]},
+            }
+        )
+        state_dict = torch.load(checkpoint_path, map_location=device)
+        n_cls = state_dict["prompt_learner.token_prefix"].shape[0]
+
+        clip_model, _ = clip.load("ViT-B/16", device=device)
+
+        model = CustomCLIP(cfg, ["X"] * n_cls, clip_model)
+        model.load_state_dict(state_dict)
+        model.change_classnames(classnames)
+        return model

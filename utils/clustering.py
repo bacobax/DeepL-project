@@ -233,38 +233,6 @@ def conditional_clustering(n_cluster, variance, cnn, device, data_dir="../data")
 
     return cluster_dict_int, cluster_labels_text
 
-def rotate_clusters(split_ratio: float, data_dir="../data"):
-    """
-    Creates a valid cluster configuration where split_ratio*N categories belong to cluster 0,
-    and the rest belong to cluster 1.
-    
-    Args:
-        split_ratio (float): Ratio of categories that should belong to cluster 0 (0 < split_ratio < 1)
-        data_dir (str): Directory where the dataset is stored
-        
-    Returns:
-        dict: Mapping from category index to cluster (0 or 1)
-    """
-    # Get the dataset to determine number of categories
-    train_set, _, _ = get_data(data_dir=data_dir)
-    base_classes, _ = base_novel_categories(train_set)
-    N = len(base_classes)
-    
-    # Calculate how many categories should be in cluster 0
-    n_zeros = int(N * split_ratio)
-    n_ones = N - n_zeros
-    
-    # Create the cluster assignment
-    cluster_assignments = {}
-    for i, category in enumerate(base_classes):
-        if i < n_zeros:
-            cluster_assignments[category] = 0
-        else:
-            cluster_assignments[category] = 1
-    
-    return cluster_assignments
-
-def clusters_history(split_ratio: float, data_dir="../data"):
     """
     Creates an array of all possible cluster configurations as heterogeneously as possible.
     Each configuration follows the split_ratio constraint.
