@@ -9,7 +9,7 @@ class EvaluationMethod(ABC):
     Abstract base class for evaluation methods. Standardizes evaluation interface for different strategies.
     """
 
-    def __init__(self, model, batch_size: int = 32):
+    def __init__(self, model, batch_size: int = 32, device=None):
         """
         Initialize evaluation method.
 
@@ -18,7 +18,7 @@ class EvaluationMethod(ABC):
             batch_size (int): Evaluation batch size.
         """
         self.model = model
-        self.device = next(self.model.parameters()).device
+        self.device = next(self.model.parameters()).device if device is None else device
         self.batch_size = batch_size
 
     @abstractmethod
