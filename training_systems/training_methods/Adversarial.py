@@ -120,7 +120,7 @@ class Adversarial(TrainingMethod):
 
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
-            logits, ce_loss, img_features, ctx, bias, avg_txt_features = self.model(inputs, targets, get_image_features=True)
+            logits, ce_loss, img_features, ctx, bias, avg_txt_features, selected_text_features = self.model(inputs, targets, get_image_features=True)
 
             if self.gaussian_noise > 0:
                 noise = torch.randn_like(logits) * self.gaussian_noise
@@ -133,7 +133,8 @@ class Adversarial(TrainingMethod):
                     ctx = ctx.expand(bias.shape[0], -1, -1)
 
                 ctx_shifted = ctx + bias  # shape: [B, L, D]
-                concat = ctx_shifted.view(ctx_shifted.size(0), -1).to(dtype=torch.float32)
+                # concat = ctx_shifted.view(ctx_shifted.size(0), -1).to(dtype=torch.float32)
+                concat = torch.cat([selected_text_features, ctx_shifted.mean(dim=1)], dim=1).to(dtype=torch.float32)
 
             else:
                 concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)

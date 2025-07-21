@@ -110,6 +110,7 @@ class CustomCLIP(nn.Module):
         # prompts: [B, n_cls, n_ctx, D] -> [B * n_cls, n_ctx, D]
         logits = []
         all_text_features = []
+        selected_text_features = []    
         # Iterate over batch
         for pts_i, imf_i in zip(prompts, image_features):
             # pts_i: [num_classes, context_length, D]
@@ -127,11 +128,16 @@ class CustomCLIP(nn.Module):
             l_i = logit_scale * imf_i @ text_features.t()
             # Append l_i (1D tensor) to logits list
             logits.append(l_i)
+            best_idx = l_i.argmax()
+            best_text_feat = text_features[best_idx]  # [D]
+            selected_text_features.append(best_text_feat)
 
         all_text_features = torch.stack(all_text_features)  # [B, num_classes, D]
         #avarage over num_classes
         avg_text_features = all_text_features.mean(dim=1)
 
+        # Shape: [B, D]
+        selected_text_features = torch.stack(selected_text_features)
         # logits: list of B tensors each of shape [num_classes]
         # stacked into a tensor of shape [B, num_classes]
         logits = torch.stack(logits)
@@ -143,7 +149,7 @@ class CustomCLIP(nn.Module):
             # logits: [B, num_classes], label: [B]
             if get_image_features:
                 # If get_image_features is True, return logits and image features
-                return logits, F.cross_entropy(logits, label), image_features, ctx, bias, avg_text_features
+                return logits, F.cross_entropy(logits, label), image_features, ctx, bias, avg_text_features, selected_text_features
             else:
                 return logits, F.cross_entropy(logits, label)
 

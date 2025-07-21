@@ -51,7 +51,7 @@ class AdversarialMLP(nn.Module):
 
         if use_bias_ctx:
             # Add a bias context layer if specified
-            layers.append(nn.Linear(512*n_ctx, hidden_dims[0]))
+            layers.append(nn.Linear(512*2, hidden_dims[0]))
             layers.append(nn.ReLU())
             for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
                 layers.append(ResidualBlock(in_dim, out_dim))

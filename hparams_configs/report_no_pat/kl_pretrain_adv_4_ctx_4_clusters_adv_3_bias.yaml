@@ -40,7 +40,7 @@ cocoop:
     grl_lambda: 1
     mlp_opt:
       hidden_structure: [563, 256, 128]
-    prompt_learner_warmup_epochs: 10
+    prompt_learner_warmup_epochs: 3
     ignore_no_improvement: true
     use_bias_ctx: true
   base_training_opt:
