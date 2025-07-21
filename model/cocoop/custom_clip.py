@@ -208,7 +208,7 @@ class CustomCLIP(nn.Module):
         for name, buf in self.clip_model.named_buffers():
             print(f"    clip_model buffer {name}: {buf.dtype}")
     @staticmethod
-    def load_from_checkpoint(classnames, checkpoint_path, device, n_ctx, clip_model, ctx_init=""):
+    def load_from_checkpoint(classnames, checkpoint_path, device, n_ctx, clip_model, ctx_8_coop, ctx_4_coop, ctx_init=""):
         """
         Load a CustomCLIP model from a saved checkpoint.
 
@@ -221,9 +221,9 @@ class CustomCLIP(nn.Module):
             CustomCLIP: An instance of CustomCLIP loaded with the checkpoint.
         """
         ctx_load = (
-            "../bin/coop/coop_ctx_4_VIT16.pth"
+            ctx_4_coop
             if n_ctx == 4
-            else "../bin/coop/coop_ctx_8_VIT16.pth"
+            else ctx_8_coop
         )
         resolution = clip_model.visual.input_resolution
         cfg = EasyDict(
