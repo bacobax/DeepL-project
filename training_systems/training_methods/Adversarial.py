@@ -35,6 +35,8 @@ class Adversarial(TrainingMethod):
             lambda_adv,
             tmp_classes: list,
             debug: bool = False,
+            gaussian_noise: float = 0.0,
+            use_bias_ctx: bool = False
     ) -> None:
         """
         Args:
@@ -52,6 +54,8 @@ class Adversarial(TrainingMethod):
         self.mlp_adversary = mlp_adversary
         self.lambda_adv = lambda_adv
         self.tmp_classes = tmp_classes
+        self.gaussian_noise = gaussian_noise
+        self.use_bias_ctx = use_bias_ctx
 
     def get_metrics(self) -> Dict[str, AverageMeter]:
         """
@@ -117,9 +121,26 @@ class Adversarial(TrainingMethod):
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
             logits, ce_loss, img_features, ctx, bias, avg_txt_features = self.model(inputs, targets, get_image_features=True)
-            concat = torch.cat([avg_txt_features, logits], dim=1).to(dtype=torch.float32)
-            reversed_logits = self.grl(concat)
-            cluster_logits = self.mlp_adversary(reversed_logits)
+
+            if self.gaussian_noise > 0:
+                noise = torch.randn_like(logits) * self.gaussian_noise
+                noisy_logits = logits + noise
+            else:
+                noisy_logits = logits
+
+            if self.use_bias_ctx:
+                if ctx.shape[0] == 1:
+                    ctx = ctx.expand(bias.shape[0], -1, -1)
+
+                ctx_shifted = ctx + bias  # shape: [B, L, D]
+                concat = ctx_shifted.view(ctx_shifted.size(0), -1).to(dtype=torch.float32)
+
+            else:
+                concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
+            # print(f"concat shape: {concat.shape}, bias shape: {bias.shape}, ctx shape: {ctx.shape}, avg_txt_features shape: {avg_txt_features.shape}, logits shape: {logits.shape}")
+            reversed_concat = self.grl(concat)
+            # print(f"reversed_concat shape: {reversed_concat.shape}")
+            cluster_logits = self.mlp_adversary(reversed_concat)
 
             if cluster_logits.shape[1] == 1:
                 # Binary classification

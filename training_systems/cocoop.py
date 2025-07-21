@@ -155,6 +155,8 @@ class CoCoOpSystem:
         self.rotation_period = kl_loss_opt.get("rotation_period", "relative")
         self.warmup_lambda_kl = kl_loss_opt.get("warmup_lambda_kl", 0)  # Add warmup parameter
         self.lambda_adv = adv_training_opt["lambda_adv"]
+        self.gaussian_noise = adv_training_opt.get("gaussian_noise", 0.0)
+        self.use_bias_ctx = adv_training_opt.get("use_bias_ctx", False)
         self.adv_training_epochs = adv_training_opt["adv_training_epochs"]
         self.cnn_model = cnn_model
         self.warmup_epoch = base_training_opt["warmup_epoch"]
@@ -238,6 +240,10 @@ class CoCoOpSystem:
         self.train_base, _ = split_data(self.train_set, self.base_classes)
         self.val_base, self.val_novel = split_data(self.val_set, self.base_classes)
         self.test_base, self.test_novel = split_data(self.test_set, self.base_classes)
+        print(f"Base classes length: {len(self.base_classes)}, Novel classes length: {len(self.novel_classes)}")
+        print(f"Train base length: {len(self.train_base)}, Val base length: {len(self.val_base)}, Test base length: {len(self.test_base)}")
+        print(f"Val novel length: {len(self.val_novel)}, Test novel length: {len(self.test_novel)}")
+
 
         self.rotation_steps = int(len(self.base_classes)*(1-self.pseudo_base_ratio))
 
@@ -282,7 +288,7 @@ class CoCoOpSystem:
         ).to(self.device)
 
         # Print all dtypes of every component inside CustomCLIP
-        self.model.print_all_dtypes()
+        # self.model.print_all_dtypes()
 
         for name, param in self.model.named_parameters():
             if "prompt_learner" not in name:
@@ -296,7 +302,7 @@ class CoCoOpSystem:
         clip_dim = self.clip_model.visual.output_dim
 
         self.mlp_adversary = AdversarialMLP(
-            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"]
+            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"], use_bias_ctx=self.use_bias_ctx, n_ctx=self.n_ctx
         ).to(self.device)
 
         print("mlp adversary struct: ", self.mlp_adversary)
@@ -383,6 +389,8 @@ class CoCoOpSystem:
                 mlp_adversary=self.mlp_adversary,
                 debug=self.debug,
                 tmp_classes=self.base_classes, 
+                gaussian_noise=self.gaussian_noise,
+                use_bias_ctx=self.use_bias_ctx
             )
             
         if self.using_kl[0]:

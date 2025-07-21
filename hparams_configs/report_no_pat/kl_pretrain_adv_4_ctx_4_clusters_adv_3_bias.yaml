@@ -1,0 +1,55 @@
+coop:
+  batch_size: 10
+  learning_rate: 0.002
+  weight_decay: 0.0001
+  momentum: 0.9
+  epochs: 20
+  n_ctx: 8
+  ctx_init: ""
+  class_token_position: "end"
+  csc: false
+
+cocoop:
+  report: true
+  pat: false
+  cnn_model: "ViT-B/16"
+  test_batch_size: 10
+  train_base_checkpoint_path: "./bin/cocoop/after_first_train_from_yaml_base_kl_v2_80_20_kl_03_rot_period_3_4_ctx_balanced_20250720_134756.pth"
+  optimizer_configs:
+    - prompt_lr: 0.002
+      weight_decay: 0.0001
+      momentum: 0.9
+    - prompt_lr: 0.002
+      mlp_lr: 0.005
+      weight_decay: 0.0005
+      momentum: 0.8
+  skip_tests: [true, true, false]
+  prompt_learner_opt:
+    n_ctx: 4
+    ctx_init: ""
+    class_token_position: "end"
+    csc: false
+  kl_loss_opt:
+    lambda_kl: [0.1, 0.1]
+    using_kl: [true, false]
+  adv_training_opt:
+    adv_training_epochs: 40
+    batch_size: 10
+    warmup_lambda_adv: 10
+    lambda_adv: 3
+    grl_lambda: 1
+    mlp_opt:
+      hidden_structure: [563, 256, 128]
+    prompt_learner_warmup_epochs: 10
+    ignore_no_improvement: true
+    use_bias_ctx: true
+  base_training_opt:
+    epochs: 0
+    batch_size: 10
+    warmup_epoch: 0
+    warmup_cons_lr: 0.00001 
+  clustering_opt:
+    n_clusters: 4
+    variance: 0.95
+    vision_encoder: "ViT-B/32"
+    clustering_type: "semantic"

@@ -33,7 +33,7 @@ cocoop:
     lambda_kl: [0.1, 0.1]
     using_kl: [true, false]
   adv_training_opt:
-    adv_training_epochs: 80
+    adv_training_epochs: 40
     batch_size: 10
     warmup_lambda_adv: 10
     lambda_adv: 1
