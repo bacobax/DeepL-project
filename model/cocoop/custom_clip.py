@@ -51,7 +51,7 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
         self.clip_model = clip_model
         self.cfg = cfg
-        self.meta_net_2 = CLSBiasAdderMLP(clip_model.visual.output_dim, dropout=0.3)
+        self.meta_net_2 = CLSBiasAdderMLP(clip_model.visual.output_dim, dropout=0.3).to(dtype=torch.float16)
 
 
     def change_classnames(self, new_classnames):
