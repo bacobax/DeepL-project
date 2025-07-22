@@ -121,8 +121,8 @@ class Adversarial(TrainingMethod):
         is_prompt_learner_frozen = all(
             not param.requires_grad for param in self.model.prompt_learner.parameters()
         )
-
-        print(f"PROMPT LEARNER {'FROZEN' if is_prompt_learner_frozen else 'UNFROZEN'}")
+        if batch_idx == 1:
+            print(f"PROMPT LEARNER {'FROZEN' if is_prompt_learner_frozen else 'UNFROZEN'}")
 
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
