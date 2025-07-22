@@ -310,7 +310,7 @@ class CoCoOpSystem:
             num_clusters=clustering_opt["n_clusters"],
             hidden_dim=self.mlp_opt["hidden_dim"],
             dropout=self.mlp_opt["dropout"],
-        )
+        ).to(device=self.device)
 
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
