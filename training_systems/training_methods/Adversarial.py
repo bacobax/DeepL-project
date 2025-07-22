@@ -118,9 +118,18 @@ class Adversarial(TrainingMethod):
             dtype=torch.float32
         )
 
+        is_prompt_learner_frozen = all(
+            not param.requires_grad for param in self.model.prompt_learner.parameters()
+        )
+
+        print(f"PROMPT LEARNER {'FROZEN' if is_prompt_learner_frozen else 'UNFROZEN'}")
+
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
-            logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, meta_net_2=True)
+
+
+
+            logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, meta_net_2=(not is_prompt_learner_frozen))
              
 
             reversed_img_features = self.grl(img_features.float())
