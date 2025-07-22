@@ -125,7 +125,7 @@ class Adversarial(TrainingMethod):
 
             reversed_img_features = self.grl(img_features.float())
             # print(f"reversed_concat shape: {reversed_concat.shape}")
-            cluster_logits, loss_adv = self.mlp_adversary(reversed_img_features, cluster_target.float())
+            cluster_logits, loss_adv = self.mlp_adversary(reversed_img_features, cluster_target.long())
 
 
             total_loss = ce_loss + self.lambda_adv * loss_adv
