@@ -123,7 +123,7 @@ class Adversarial(TrainingMethod):
             logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, meta_net_2=True)
              
 
-            reversed_img_features = self.grl(img_features)
+            reversed_img_features = self.grl(img_features.float())
             # print(f"reversed_concat shape: {reversed_concat.shape}")
             cluster_logits, loss_adv = self.mlp_adversary(reversed_img_features, cluster_target.float())
 
