@@ -38,12 +38,12 @@ cocoop:
   adv_training_opt:
     adv_training_epochs: 40
     batch_size: 10
-    warmup_lambda_adv: 10
-    lambda_adv: 0.3
+    warmup_lambda_adv: 30
+    lambda_adv: 1.5
     grl_lambda: 1
     mlp_opt:
       hidden_dim: 512
-      dropout: 0.3
+      dropout: 0.2
     prompt_learner_warmup_epochs: 10
     ignore_no_improvement: true
     gaussian_noise: 0.2

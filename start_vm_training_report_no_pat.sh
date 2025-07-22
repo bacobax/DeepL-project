@@ -13,7 +13,7 @@ DEVICE="cuda"  # or "cpu" if no GPU available
 USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
-    "adv_v2"
+    "adv_v2_lambda_15_warmup"
     
 )
 DEBUG="false"

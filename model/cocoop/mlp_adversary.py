@@ -63,7 +63,6 @@ class CLSBiasAdderMLP(nn.Module):
         if not apply_bias:
             return cls_embedding  # identity
         
-        print(f"input type: {cls_embedding.dtype}")
         bias = self.fc1(cls_embedding)
         bias = self.relu(bias)
         bias = self.dropout(bias)
