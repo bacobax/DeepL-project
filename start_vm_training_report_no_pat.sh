@@ -14,6 +14,9 @@ USING_COOP="false"
 RUN_PREFIX="from_yaml"
 HPARAMS_CONFS=(
     "adv_v2_lambda_15_warmup"
+    "adv_v2_all_adv_lambda_15_warmup"
+    "adv_v2_all_adv_lambda_05"
+
     
 )
 DEBUG="false"
