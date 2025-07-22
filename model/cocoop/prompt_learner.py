@@ -126,6 +126,7 @@ class PromptLearner(nn.Module):
         #print("im_features stats", im_features.min().item(), im_features.max().item(), im_features.norm(dim=1).mean().item())
 
         meta_net_dtype = next(self.meta_net.parameters()).dtype
+        print(f"meta_net_dtype: {meta_net_dtype}, im_features dtype: {im_features.dtype}")
         bias = self.meta_net(im_features.to(meta_net_dtype))  # (batch, ctx_dim)
         if bias.isnan().any():
             raise ValueError("NaN detected in bias")
