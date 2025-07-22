@@ -75,7 +75,7 @@ class FineTunedTestStep(EvaluationMethod):
     """
 
     @torch.no_grad()
-    def evaluate(self, dataset, classnames: list[int], desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, classnames: list[int], desc_add="", meta_net_2=False) -> Dict[str, float]:
         self.model.eval()
         accuracy_meter = AverageMeter()
         tmp_dataset = ContiguousLabelDataset(dataset, classnames)
@@ -86,7 +86,7 @@ class FineTunedTestStep(EvaluationMethod):
             for images, targets in dataloader:
                 images = images.to(self.device)
                 targets = targets.to(self.device)
-                logits = self.model(images)
+                logits = self.model(images, meta_net_2=meta_net_2)
                 predictions = logits.argmax(dim=-1)
                 correct = (predictions == targets).sum().item()
                 accuracy_meter.update(correct, n=targets.size(0), raw=True)

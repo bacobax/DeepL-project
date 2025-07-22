@@ -42,38 +42,81 @@ class GradientReversalLayer(nn.Module):
         return GradientReversalFunction.apply(x, self.lambda_)
 
 
-class AdversarialMLP(nn.Module):
-    def __init__(self, input_dim, opt, output_dim=1, use_bias_ctx=False, n_ctx=4):
+
+
+class CLSBiasAdderMLP(nn.Module):
+    def __init__(self, cls_dim, dropout=0.1):
         super().__init__()
-        hidden_dims = opt.hidden_structure
+        self.fc1 = nn.Linear(cls_dim, cls_dim//4)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(cls_dim//4, cls_dim)
+        self.init_weights()
 
-        layers = []
+    def _init_weights(self):
+        nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
+        nn.init.zeros_(self.fc1.bias)
+        nn.init.kaiming_normal_(self.fc2.weight, nonlinearity='linear')
+        nn.init.zeros_(self.fc2.bias)
 
-        if use_bias_ctx:
-            # Add a bias context layer if specified
-            layers.append(nn.Linear(512*2, hidden_dims[0]))
-            layers.append(nn.ReLU())
-            for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
-                layers.append(ResidualBlock(in_dim, out_dim))
-        else:
-            for in_dim, out_dim in zip(hidden_dims[:-1], hidden_dims[1:]):
-                layers.append(ResidualBlock(in_dim, out_dim))
+    def forward(self, cls_embedding, apply_bias: bool = True):
+        if not apply_bias:
+            return cls_embedding  # identity
+        bias = self.fc1(cls_embedding)
+        bias = self.relu(bias)
+        bias = self.dropout(bias)
+        bias = self.fc2(bias)
+        return cls_embedding + bias
 
-        # Final output layer with configurable output_dim
-        layers.append(nn.Linear(hidden_dims[-1], output_dim))
-        self.model = nn.Sequential(*layers)
+    
 
-        self.model.apply(self.init_weights.__get__(self, AdversarialMLP))
 
-    def forward(self, x):
-        return self.model(x)
+class CLSDiscriminatorMLP(nn.Module):
+    def __init__(self, cls_dim: int, num_clusters: int, hidden_dim: int = 512, dropout: float = 0.1):
+        """
+        Args:
+            cls_dim (int): Dimensionality of the CLS embedding from the vision encoder.
+            num_clusters (int): Number of output clusters (i.e., classes).
+            hidden_dim (int): Size of the hidden layer.
+            dropout (float): Dropout rate between layers.
+        """
+        super(CLSDiscriminatorMLP, self).__init__()
+        self.num_clusters = num_clusters
+        self.net = nn.Sequential(
+            nn.Linear(cls_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, num_clusters if num_clusters > 2 else 1)
+        )
 
-    def predict(self, x):
-        out = self.forward(x)
-        return torch.sigmoid(out).squeeze(-1) if out.shape[-1] == 1 else torch.sigmoid(out)
+    def forward(self, cls_embedding, label=None):
+        """
+        Args:
+            cls_embedding (Tensor): shape (B, cls_dim)
+        Returns:
+            logits (Tensor): shape (B, num_clusters)
+        """
+        logits = self.net(cls_embedding)
+        if label is not None:
+            loss = get_discriminator_loss(self.num_clusters)(logits, label)
+            return logits, loss
+        return logits
 
     def init_weights(self, m):
         if isinstance(m, nn.Linear):
             nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
+
+
+def get_discriminator_loss(num_clusters):
+    if num_clusters == 1:
+        # BCEWithLogitsLoss expects float labels of shape (B, 1)
+        return nn.BCEWithLogitsLoss()
+    elif num_clusters == 2:
+        # BCEWithLogitsLoss for binary, but you may want to use CrossEntropyLoss if your labels are class indices (0/1)
+        # If your labels are one-hot or float, use BCEWithLogitsLoss
+        return nn.BCEWithLogitsLoss()
+    else:
+        # CrossEntropyLoss expects class indices (LongTensor) of shape (B,)
+        return nn.CrossEntropyLoss()

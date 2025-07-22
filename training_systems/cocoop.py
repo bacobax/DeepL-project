@@ -20,7 +20,7 @@ import random
 import hashlib
 
 from model.cocoop.custom_clip import CustomCLIP
-from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
+from model.cocoop.mlp_adversary import CLSDiscriminatorMLP, GradientReversalLayer, AdversarialMLP
 from utils import (
     conditional_clustering,
     random_clustering,
@@ -301,9 +301,16 @@ class CoCoOpSystem:
 
         clip_dim = self.clip_model.visual.output_dim
 
-        self.mlp_adversary = AdversarialMLP(
-            input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"], use_bias_ctx=self.use_bias_ctx, n_ctx=self.n_ctx
-        ).to(self.device)
+        # self.mlp_adversary = AdversarialMLP(
+        #     input_dim=clip_dim+len(self.base_classes), opt=self.mlp_opt, output_dim=clustering_opt["n_clusters"], use_bias_ctx=self.use_bias_ctx, n_ctx=self.n_ctx
+        # ).to(self.device)
+
+        self.mlp_adversary = CLSDiscriminatorMLP(
+            cls_dim=clip_dim,
+            num_clusters=clustering_opt["n_clusters"],
+            hidden_dim=self.mlp_opt["hidden_dim"],
+            dropout=self.mlp_opt["dropout"],
+        )
 
         print("mlp adversary struct: ", self.mlp_adversary)
         self.optimizer = self.get_optimizer(self.model, None, self.optimizer_configs[0])
@@ -426,7 +433,7 @@ class CoCoOpSystem:
         self._set_train_methods()
         if not self.skip_tests[0]:
             print("Doing base accuracy test")
-            base_acc, novel_acc = self.compute_evaluation(-1, base=True)
+            base_acc, novel_acc = self.compute_evaluation(-1, after_adv=False, base=True)
             self._log_final_metrics(
                 "Final metrics - CLIP ZERO SHOT",
                 base_acc,
@@ -458,7 +465,7 @@ class CoCoOpSystem:
 
             if not self.skip_tests[1]:
                 print("Doing base accuracy test")
-                base_acc, novel_acc = self.compute_evaluation(base_end_epoch)
+                base_acc, novel_acc = self.compute_evaluation(base_end_epoch, after_adv=False)
                 self._log_final_metrics(
                     "Final metrics - After Base Training",
                     base_acc,
@@ -500,7 +507,7 @@ class CoCoOpSystem:
 
         if not self.skip_tests[2]:
             print("Doing post-adv. accuracy test")
-            base_acc, novel_acc = self.compute_evaluation(adv_end_epoch)
+            base_acc, novel_acc = self.compute_evaluation(adv_end_epoch, after_adv=True)
             self._log_final_metrics(
                 "Final metrics - After Adversarial Training",
                 base_acc,
@@ -811,6 +818,7 @@ class CoCoOpSystem:
                 dataset=self.val_base,
                 classnames=self.base_classes,
                 desc_add=" - Base",
+                meta_net_2=True
             )
             base_val_loss = metrics_base["loss"]
             base_val_acc = metrics_base["accuracy"]
@@ -819,6 +827,7 @@ class CoCoOpSystem:
                 dataset=self.val_novel,
                 classnames=self.novel_classes,
                 desc_add=" - Novel",
+                meta_net_2=True
             )
             novel_val_loss = metrics_novel["loss"]
             novel_val_acc = metrics_novel["accuracy"]   
@@ -829,6 +838,7 @@ class CoCoOpSystem:
                 dataset=self.val_base,
                 classnames=self.base_classes,
                 desc_add=" - Base",
+                meta_net_2=False
             )
             base_val_loss = metrics_base["loss"]
             base_val_acc = metrics_base["accuracy"]
@@ -837,6 +847,7 @@ class CoCoOpSystem:
                 dataset=self.val_novel,
                 classnames=self.novel_classes,
                 desc_add=" - Novel",
+                meta_net_2=False
             )
             novel_val_loss = metrics_novel["loss"]
             novel_val_acc = metrics_novel["accuracy"]  
@@ -885,7 +896,7 @@ class CoCoOpSystem:
             )
         )
 
-    def compute_evaluation(self, epoch_idx, base=False):
+    def compute_evaluation(self, epoch_idx, after_adv, base=False ):
         """
         Run evaluation on the test split for both base and novel classes.
 
@@ -915,11 +926,13 @@ class CoCoOpSystem:
                 dataset=self.test_base,
                 classnames=self.base_classes,
                 desc_add=" - Base Fine Tuned",
+                meta_net_2=after_adv
             )
             novel_metrics = self.finetuned_test_method.evaluate(
                 dataset=self.test_novel,
                 classnames=self.novel_classes,
                 desc_add=" - Novel Fine Tuned",
+                meta_net_2=after_adv
             )
 
         base_accuracy = base_metrics["accuracy"]

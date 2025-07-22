@@ -120,42 +120,14 @@ class Adversarial(TrainingMethod):
 
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
-            logits, ce_loss, img_features, ctx, bias, avg_txt_features, selected_text_features = self.model(inputs, targets, get_image_features=True)
+            logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, met_net_2=True)
+             
 
-            if self.gaussian_noise > 0:
-                noise = torch.randn_like(logits) * self.gaussian_noise
-                noisy_logits = logits + noise
-            else:
-                noisy_logits = logits
-
-            if self.use_bias_ctx:
-                if ctx.shape[0] == 1:
-                    ctx = ctx.expand(bias.shape[0], -1, -1)
-
-                ctx_shifted = ctx + bias  # shape: [B, L, D]
-                # concat = ctx_shifted.view(ctx_shifted.size(0), -1).to(dtype=torch.float32)
-                concat = torch.cat([selected_text_features, ctx_shifted.mean(dim=1)], dim=1).to(dtype=torch.float32)
-
-            else:
-                concat = torch.cat([avg_txt_features, noisy_logits], dim=1).to(dtype=torch.float32)
-            # print(f"concat shape: {concat.shape}, bias shape: {bias.shape}, ctx shape: {ctx.shape}, avg_txt_features shape: {avg_txt_features.shape}, logits shape: {logits.shape}")
-            reversed_concat = self.grl(concat)
+            reversed_img_features = self.grl(img_features)
             # print(f"reversed_concat shape: {reversed_concat.shape}")
-            cluster_logits = self.mlp_adversary(reversed_concat)
+            cluster_logits, loss_adv = self.mlp_adversary(reversed_img_features, cluster_target.float())
 
-            if cluster_logits.shape[1] == 1:
-                # Binary classification
-                cluster_logits = cluster_logits.squeeze(-1)
-                loss_adv = F.binary_cross_entropy_with_logits(cluster_logits, cluster_target.float())
-            else:
-                # Multi-class classification
-                loss_adv = F.cross_entropy(cluster_logits, cluster_target.long())
 
-            # Skip adversarial update if prompt learner is frozen
-            if any(p.requires_grad for p in self.model.prompt_learner.parameters()):
-                ce_grads = self.get_grads(ce_loss)
-            else:
-                ce_grads = None  # Or torch.zeros_like(...), depending on downstream use
             total_loss = ce_loss + self.lambda_adv * loss_adv
 
             total_loss = total_loss / accumulation_steps

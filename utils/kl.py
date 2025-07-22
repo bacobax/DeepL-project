@@ -48,7 +48,7 @@ def get_kl_loss(device, inputs_novel, model, targets_novel, tmp_dataset):
     
     with model.temporary_classnames(remapped_class_names):
         model.train()
-        student_logits, student_loss = model(inputs_novel, target_remapped)  # [B, num_classes]
+        student_logits, student_loss = model(inputs_novel, target_remapped, met_net_2=False)  # [B, num_classes]
         kl_loss = torch.nn.functional.kl_div(
             torch.nn.functional.log_softmax(student_logits, dim=-1),
             torch.nn.functional.softmax(clip_logits, dim=-1),

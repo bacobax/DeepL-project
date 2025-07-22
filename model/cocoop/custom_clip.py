@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.cuda.amp import GradScaler, autocast
 from model.cocoop.prompt_learner import PromptLearner
-from model.cocoop.mlp_adversary import GradientReversalLayer, AdversarialMLP
+from model.cocoop.mlp_adversary import CLSBiasAdderMLP, CLSDiscriminatorMLP
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
 from easydict import EasyDict
@@ -51,6 +51,7 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
         self.clip_model = clip_model
         self.cfg = cfg
+        self.meta_net_2 = CLSBiasAdderMLP(self.prompt_learner.cls_dim, dropout=0.3)
 
 
     def change_classnames(self, new_classnames):
@@ -106,7 +107,7 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.n_cls = original_classnames
 
 
-    def forward(self, image, label=None, get_image_features=False):
+    def forward(self, image, label=None, get_image_features=False, meta_net_2=True):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
 
@@ -119,6 +120,8 @@ class CustomCLIP(nn.Module):
         image_features = self.image_encoder(image.type(self.dtype))
         if image_features.isnan().any():
             raise ValueError("NaN detected in image_features.")
+
+        image_features = self.meta_net_2(image_features, apply_bias=meta_net_2)
         # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 

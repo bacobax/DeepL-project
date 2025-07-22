@@ -14,7 +14,7 @@ class EvalStep(EvaluationMethod):
     Generic evaluation step for models that support temporary class name modification.
     """
     @torch.no_grad()
-    def evaluate(self, dataset, classnames, desc_add="") -> Dict[str, float]:
+    def evaluate(self, dataset, classnames, desc_add="", meta_net_2=False) -> Dict[str, float]:
         """
         Evaluate model performance on the provided dataset.
 
@@ -34,12 +34,12 @@ class EvalStep(EvaluationMethod):
 
         remapped_classnames = [ CLASS_NAMES[ tmp_dataset.idx2cat[i] ] for i in range(len(tmp_dataset.idx2cat)) ]
         with self.model.temporary_classnames(remapped_classnames):
-            self.walk(loss_meter, accuracy_meter, dataloader, desc_add)
+            self.walk(loss_meter, accuracy_meter, dataloader, desc_add, meta_net_2)
 
         return {"loss": loss_meter.avg, "accuracy": accuracy_meter.avg}
 
     @torch.no_grad()
-    def walk(self, loss_meter, accuracy_meter, dataloader, desc_add=""):
+    def walk(self, loss_meter, accuracy_meter, dataloader, desc_add="", meta_net_2=False):
         """
         Perform the evaluation loop over the dataset.
 
@@ -52,7 +52,7 @@ class EvalStep(EvaluationMethod):
         for images, targets in tqdm(dataloader, desc="Validation" + desc_add, position=1, leave=False):
             images = images.to(self.device)
             targets = targets.to(self.device)
-            logits = self.model(images)
+            logits = self.model(images, meta_net_2=meta_net_2)
             loss = F.cross_entropy(logits, targets)
             predictions = logits.argmax(dim=-1)
             correct = (predictions == targets).sum().item()
