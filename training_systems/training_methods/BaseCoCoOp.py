@@ -85,7 +85,7 @@ class BaseCoCoOp(TrainingMethod):
         inputs_base = inputs.to(self.device)
         targets_base = targets.to(self.device)
 
-        logits_base, loss_ce = self.model(inputs_base, targets_base, met_net_2=False)
+        logits_base, loss_ce = self.model(inputs_base, targets_base, meta_net_2=False)
         # === Combine losses ===
         print("SHAPES LOGITS: ",logits_base.shape, targets_base.shape)
         

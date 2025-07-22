@@ -120,7 +120,7 @@ class Adversarial(TrainingMethod):
 
         # Use all tmp_classes for adversarial phase
         with self.model.temporary_classnames([CLASS_NAMES[idx] for idx in self.tmp_classes]):
-            logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, met_net_2=True)
+            logits, ce_loss, img_features, _, _, _, _ = self.model(inputs, targets, get_image_features=True, meta_net_2=True)
              
 
             reversed_img_features = self.grl(img_features)

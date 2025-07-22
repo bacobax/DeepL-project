@@ -51,7 +51,7 @@ class CLSBiasAdderMLP(nn.Module):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(cls_dim//4, cls_dim)
-        self.init_weights()
+        self._init_weights()
 
     def _init_weights(self):
         nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
@@ -69,7 +69,12 @@ class CLSBiasAdderMLP(nn.Module):
         return cls_embedding + bias
 
     
-
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+            
 
 class CLSDiscriminatorMLP(nn.Module):
     def __init__(self, cls_dim: int, num_clusters: int, hidden_dim: int = 512, dropout: float = 0.1):
@@ -88,6 +93,8 @@ class CLSDiscriminatorMLP(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, num_clusters if num_clusters > 2 else 1)
         )
+        self.apply(init_weights)
+        
 
     def forward(self, cls_embedding, label=None):
         """
@@ -102,11 +109,8 @@ class CLSDiscriminatorMLP(nn.Module):
             return logits, loss
         return logits
 
-    def init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.xavier_uniform_(m.weight)
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
+
+
 
 
 def get_discriminator_loss(num_clusters):

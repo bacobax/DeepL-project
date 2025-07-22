@@ -126,7 +126,7 @@ class KLCoCoOp(TrainingMethod):
 
         with self.model.temporary_classnames(remapped_class_names):
             self.model.train()
-            logits_base, loss_ce = self.model(inputs_base, target_remapped, met_net_2=False)
+            logits_base, loss_ce = self.model(inputs_base, target_remapped, meta_net_2=False)
 
         # === Pseudo-novel: KL divergence with frozen CLIP ===
         self.model.eval()  # needed to disable dropout etc.
