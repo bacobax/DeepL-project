@@ -121,10 +121,10 @@ class CustomCLIP(nn.Module):
         if image_features.isnan().any():
             raise ValueError("NaN detected in image_features.")
 
-        image_features = self.meta_net_2(image_features, apply_bias=meta_net_2)
         # Normalize image features: each row to unit length
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
+        image_features = self.meta_net_2(image_features, apply_bias=meta_net_2)
         # prompts: List of [num_classes, context_length, D] (one per image feature)
         # Each element is generated conditioned on an image feature
         prompts, ctx, bias = self.prompt_learner(image_features) # [B , n_cls, n_ctx, D]

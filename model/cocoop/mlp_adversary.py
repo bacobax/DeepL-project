@@ -48,13 +48,14 @@ class CLSBiasAdderMLP(nn.Module):
     def __init__(self, cls_dim, dropout=0.1):
         super().__init__()
         self.fc1 = nn.Linear(cls_dim, cls_dim//4)
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(negative_slope=0.01)
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(cls_dim//4, cls_dim)
+
         self._init_weights()
 
     def _init_weights(self):
-        nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
+        nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='leaky_relu')
         nn.init.zeros_(self.fc1.bias)
         nn.init.kaiming_normal_(self.fc2.weight, nonlinearity='linear')
         nn.init.zeros_(self.fc2.bias)
@@ -67,6 +68,7 @@ class CLSBiasAdderMLP(nn.Module):
         bias = self.relu(bias)
         bias = self.dropout(bias)
         bias = self.fc2(bias)
+        bias = torch.tanh(bias)
         return cls_embedding + bias
 
     
