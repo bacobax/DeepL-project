@@ -17,6 +17,13 @@ _tokenizer = _Tokenizer()
 
 
 class TextEncoder(nn.Module):
+    """
+    TextEncoder wraps CLIP's internal transformer-based text encoder.
+    It encodes tokenized prompts with learned positional embeddings and projects them to the shared feature space.
+    """
+    """
+    Initialize the TextEncoder by extracting relevant CLIP transformer components.
+    """
     def __init__(self, clip_model):
         super().__init__()
         self.transformer = clip_model.transformer
@@ -26,6 +33,10 @@ class TextEncoder(nn.Module):
         self.dtype = clip_model.dtype
         print(f"self.dtype={self.dtype}")
 
+    """
+    Encode a batch of prompts into text features using the transformer and positional embeddings.
+    Returns the end-of-text (EOT) token representations projected into the feature space.
+    """
     def forward(self, prompts, tokenized_prompts):
         x = prompts + self.positional_embedding.type(self.dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
@@ -41,6 +52,14 @@ class TextEncoder(nn.Module):
 
 
 class CustomCLIP(nn.Module):
+    """
+    CustomCLIP is a modified CLIP wrapper supporting CoCoOp prompt learning and adversarial training extensions.
+    It enables image-text matching via learned prompts and exposes additional methods for class manipulation.
+    """
+    """
+    Initialize the CustomCLIP model with the given configuration, classnames, and base CLIP model.
+    Sets up the image and text encoders and prepares the prompt learner.
+    """
     def __init__(self, cfg, classnames, clip_model):
         super().__init__()
         self.prompt_learner = PromptLearner(cfg, classnames, clip_model)
@@ -53,13 +72,10 @@ class CustomCLIP(nn.Module):
         self.cfg = cfg
 
 
+    """
+    Updates the prompt learner with a new list of classnames and resets its tokenized prompts.
+    """
     def change_classnames(self, new_classnames):
-        """
-        Change the class names and update the prompt learner's tokenized prompts accordingly.
-
-        Args:
-            new_classnames (list): List of new class names.
-        """
         temp_prompt_learner = PromptLearner(
             cfg=self.cfg,
             classnames=new_classnames,
@@ -74,6 +90,9 @@ class CustomCLIP(nn.Module):
 
 
 
+    """
+    A context manager that temporarily sets new classnames for inference, restoring the original ones afterward.
+    """
     @contextmanager
     def temporary_classnames(self, new_classnames):
         # --- Save original state ---
@@ -106,6 +125,10 @@ class CustomCLIP(nn.Module):
             self.prompt_learner.n_cls = original_classnames
 
 
+    """
+    Performs a forward pass through the model, computing similarity logits between image features and prompt-conditioned text features.
+    Optionally returns loss, image features, and intermediate representations during training.
+    """
     def forward(self, image, label=None, get_image_features=False):
         # tokenized_prompts: [num_classes, context_length] (e.g., [10, 77])
         tokenized_prompts = self.tokenized_prompts
@@ -176,6 +199,9 @@ class CustomCLIP(nn.Module):
         # Otherwise, return logits for evaluation: [B, num_classes]
         return logits
 
+    """
+    Utility function to print the data types of all parameters and buffers in each model component for debugging.
+    """
     def print_all_dtypes(self):
         print(f"CustomCLIP dtype: {self.dtype}")
         print(f"  logit_scale dtype: {getattr(self.logit_scale, 'dtype', type(self.logit_scale))}")
@@ -207,19 +233,12 @@ class CustomCLIP(nn.Module):
             print(f"    clip_model param {name}: {param.dtype}")
         for name, buf in self.clip_model.named_buffers():
             print(f"    clip_model buffer {name}: {buf.dtype}")
+    """
+    Loads a CustomCLIP instance from a saved checkpoint.
+    Sets up model configuration, restores state dict, and reassigns classnames.
+    """
     @staticmethod
     def load_from_checkpoint(classnames, checkpoint_path, device, n_ctx, clip_model, ctx_8_coop, ctx_4_coop, ctx_init=""):
-        """
-        Load a CustomCLIP model from a saved checkpoint.
-
-        Args:
-            classnames (list): List of class names for the model.
-            checkpoint_path (str): Path to the saved checkpoint file.
-            device (str): Device to load the model onto (e.g., 'cuda', 'cpu').
-
-        Returns:
-            CustomCLIP: An instance of CustomCLIP loaded with the checkpoint.
-        """
         ctx_load = (
             ctx_4_coop
             if n_ctx == 4

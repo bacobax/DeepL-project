@@ -9,7 +9,15 @@ _tokenizer = _Tokenizer()
 
 
 class PromptLearner(nn.Module):
+    """
+    The PromptLearner dynamically generates context-conditioned prompts for each class using a meta-network and learned context vectors.
+    This module supports both random and pre-initialized context tokens, and computes prompt embeddings compatible with CLIP.
+    """
     def __init__(self, cfg, classnames, clip_model):
+        """
+        Initialize the PromptLearner with configuration parameters, class names, and a CLIP model.
+        Loads or initializes context vectors and builds the meta-network for instance-conditioned prompt adaptation.
+        """
         super().__init__()
         n_cls = len(classnames)
         n_ctx = cfg.TRAINER.COCOOP.N_CTX
@@ -96,6 +104,10 @@ class PromptLearner(nn.Module):
         self.name_lens = name_lens
 
     def construct_prompts(self, ctx, prefix, suffix, label=None):
+        """
+        Construct the full tokenized prompt from context tokens, prefix (SOS), and suffix (CLS, EOS).
+        Optionally uses label indexing for training-time class selection.
+        """
         # dim0 is either batch_size (during training) or n_cls (during testing)
         # ctx: context tokens, with shape of (dim0, n_ctx, ctx_dim)
         # prefix: the sos token, with shape of (n_cls, 1, ctx_dim)
@@ -117,6 +129,11 @@ class PromptLearner(nn.Module):
         return prompts
 
     def forward(self, im_features):
+        """
+        Generate the context-conditioned prompts for each class based on input image features.
+        Applies the meta-network to compute per-instance bias vectors, which shift the context tokens.
+        Returns the generated prompts along with the original context and computed bias.
+        """
         prefix = self.token_prefix
         suffix = self.token_suffix
         ctx = self.ctx                     # (n_ctx, ctx_dim)
