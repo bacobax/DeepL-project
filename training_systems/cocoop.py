@@ -20,7 +20,7 @@ import random
 import hashlib
 
 from model.cocoop.custom_clip import CustomCLIP
-from model.cocoop.mlp_adversary import CLSDiscriminatorMLP, GradientReversalLayer, AdversarialMLP
+from model.cocoop.mlp_adversary import CLSDiscriminatorMLP, GradientReversalLayer
 from utils import (
     conditional_clustering,
     random_clustering,

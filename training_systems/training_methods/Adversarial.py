@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from training_systems.core import TrainingMethod
 from utils import AverageMeter, ContiguousLabelDataset, CLASS_NAMES
-from model.cocoop.mlp_adversary import AdversarialMLP, GradientReversalLayer
+from model.cocoop.mlp_adversary import GradientReversalLayer
 
 
 class Adversarial(TrainingMethod):
@@ -31,7 +31,7 @@ class Adversarial(TrainingMethod):
             optimizer: Any,
             cls_cluster_dict: Dict[int, Any],
             grl: GradientReversalLayer,
-            mlp_adversary: AdversarialMLP,
+            mlp_adversary,
             lambda_adv,
             tmp_classes: list,
             debug: bool = False,
